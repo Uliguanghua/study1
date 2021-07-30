@@ -1,0 +1,15 @@
+"D:\software\IAR8.321\arm\bin\armproc.dll" 
+
+"D:\software\IAR8.321\arm\bin\armstlink2.dll" 
+
+"C:\Users\guanghua\Desktop\liguanghua\8_PLSR\code\IAR\Debug\Exe\PLSR.out" 
+
+--plugin="D:\software\IAR8.321\arm\bin\armbat.dll" 
+
+--device_macro="D:\software\IAR8.321\arm\config\debugger\ST\STM32F4xx.dmac" 
+
+--flash_loader="D:\software\IAR8.321\arm\config\flashloader\ST\FlashSTM32F4xxx.board" 
+
+
+
+
