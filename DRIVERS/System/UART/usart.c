@@ -56,7 +56,7 @@ void uart_init(u32 bound){
 	//USART_ClearFlag(USART1, USART_FLAG_TC);
 	
 #if EN_USART1_RX	
-	USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);//开启相关中断
+	USART_ITConfig(USART1, USART_IT_IDLE, ENABLE);//开启串口空闲中断
 
 	//Usart1 NVIC 配置
   NVIC_InitStructure.NVIC_IRQChannel = USART1_IRQn;//串口1中断通道

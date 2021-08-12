@@ -1,50 +1,5 @@
 #include "pwm.h"
 
-//TIM14通道
-//arr：自动重装值
-//psc：时钟预分频数
-
-//void TIM14_PWM_Init(u32 arr,u32 psc)
-//{		 					 
-//	
-//        GPIO_InitTypeDef GPIO_InitStructure;
-//	TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-//	TIM_OCInitTypeDef  TIM_OCInitStructure;
-//	
-//	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM14,ENABLE);  	   
-//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOF, ENABLE); 	
-//	
-//	GPIO_PinAFConfig(GPIOF,GPIO_PinSource9,GPIO_AF_TIM14); 
-//	
-//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;           //GPIOF9
-//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;        
-//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	
-//	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;      
-//	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;        
-//	GPIO_Init(GPIOF,&GPIO_InitStructure);              
-//	  
-//	TIM_TimeBaseStructure.TIM_Prescaler=psc;  
-//	TIM_TimeBaseStructure.TIM_CounterMode=TIM_CounterMode_Up;
-//	TIM_TimeBaseStructure.TIM_Period=arr;   
-//	TIM_TimeBaseStructure.TIM_ClockDivision=TIM_CKD_DIV1; 
-//	
-//	TIM_TimeBaseInit(TIM14,&TIM_TimeBaseStructure);
-//	
-// 
-//	TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1; //模式1
-// 	TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;//比较输出 
-//	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low; 
-//	TIM_OC1Init(TIM14, &TIM_OCInitStructure);  
-//
-//	TIM_OC1PreloadConfig(TIM14, TIM_OCPreload_Enable);  
-// 
-//        TIM_ARRPreloadConfig(TIM14,ENABLE);
-//	
-//	TIM_Cmd(TIM14, ENABLE);  
-//										  
-//}  
-
-
 /******************************************* PWM输出 ********************************************/
 
 void PWM_TIM_Configuration(void)
@@ -54,8 +9,8 @@ void PWM_TIM_Configuration(void)
   TIM_OCInitTypeDef       TIM_OCInitStructure;
 
 
-  RCC_APB1PeriphClockCmd(PWM_TIM_CLK, ENABLE);
-  RCC_AHB1PeriphClockCmd(PWM_TIM_GPIO_CLK, ENABLE);
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM14, ENABLE);
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOF, ENABLE);
 
   GPIO_InitStructure.GPIO_Pin = PWM_TIM_PIN;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
@@ -72,19 +27,19 @@ void PWM_TIM_Configuration(void)
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;        
   TIM_TimeBaseStructure.TIM_Period = 0xFFFF;                        
   TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;            
-  TIM_TimeBaseInit(PWM_TIMx, &TIM_TimeBaseStructure);
+  TIM_TimeBaseInit(TIM14, &TIM_TimeBaseStructure);
 
 
   TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;                  
   TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;      
   TIM_OCInitStructure.TIM_Pulse = 0xFFFF;                            
   TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;          
-  PWM_TIM_OCxInit(PWM_TIMx, &TIM_OCInitStructure);
+  PWM_TIM_OCxInit(TIM14, &TIM_OCInitStructure);
   
-  TIM_SelectMasterSlaveMode( PWM_TIMx, TIM_MasterSlaveMode_Enable);		// 定时器主从模式使能
-  TIM_SelectOutputTrigger( PWM_TIMx, TIM_TRGOSource_Update);			// 选择触发方式：使用更新事件作为触发输出
+  TIM_SelectMasterSlaveMode( TIM14, TIM_MasterSlaveMode_Enable);		// 定时器主从模式使能
+  TIM_SelectOutputTrigger( TIM14, TIM_TRGOSource_Update);			// 选择触发方式：使用更新事件作为触发输出
 
-  TIM_Cmd(PWM_TIMx, DISABLE);
+  TIM_Cmd(TIM14, DISABLE);
 }
 
 /************************************************
@@ -144,11 +99,11 @@ void PWM_Output(uint32_t Frequency, uint32_t Dutycycle)
       return;
     }
 
-  TIM_Cmd(PWM_TIMx, DISABLE);                                        //失能TIM
-  TIM_SetCounter(PWM_TIMx, 0);                                       //计数清零
-  TIM_SetAutoreload(PWM_TIMx, pwm_period);                           //更改频率
-  PWM_TIM_SetComparex(PWM_TIMx, pwm_pulse);                          //更改占空比
-  TIM_Cmd(PWM_TIMx, ENABLE);                                         //使能TIM
+  TIM_Cmd(TIM14, DISABLE);                                        //失能TIM
+  TIM_SetCounter(TIM14, 0);                                       //计数清零
+  TIM_SetAutoreload(TIM14, pwm_period);                           //更改频率
+  PWM_TIM_SetComparex(TIM14, pwm_pulse);                          //更改占空比
+  TIM_Cmd(TIM14, ENABLE);                                         //使能TIM
   
 }
 

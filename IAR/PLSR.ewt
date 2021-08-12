@@ -2372,6 +2372,9 @@
     <group>
         <name>APP</name>
         <file>
+            <name>$PROJ_DIR$\..\APP\fun.c</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\APP\main.c</name>
         </file>
         <file>
@@ -2653,6 +2656,33 @@
         <group>
             <name>system</name>
             <group>
+                <name>DELAY</name>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\delay\delay.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\delay\delay.h</name>
+                </file>
+            </group>
+            <group>
+                <name>DMA</name>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\DMA\dma.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\DMA\dma.h</name>
+                </file>
+            </group>
+            <group>
+                <name>EXTI</name>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\EXTI\exti.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\EXTI\exti.h</name>
+                </file>
+            </group>
+            <group>
                 <name>LED</name>
                 <file>
                     <name>$PROJ_DIR$\..\DRIVERS\System\LED\led.c</name>
@@ -2662,9 +2692,27 @@
                 </file>
             </group>
             <group>
+                <name>PWM</name>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\PWM\pwm.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\PWM\pwm.h</name>
+                </file>
+            </group>
+            <group>
                 <name>SYS</name>
                 <file>
                     <name>$PROJ_DIR$\..\DRIVERS\System\sys\sys.h</name>
+                </file>
+            </group>
+            <group>
+                <name>USART</name>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\UART\usart.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\UART\usart.h</name>
                 </file>
             </group>
         </group>

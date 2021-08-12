@@ -8,7 +8,7 @@ void LED_Init(void)
         
 	GPIO_InitTypeDef GPIO_InitStructure;
 	
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOF|RCC_AHB1Periph_GPIOB|RCC_AHB1Periph_GPIOE|RCC_AHB1Periph_GPIOH|RCC_AHB1Periph_GPIOG,ENABLE); //使能GPIOF、B、E、H、G的时钟
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOF|RCC_AHB1Periph_GPIOB|RCC_AHB1Periph_GPIOE|RCC_AHB1Periph_GPIOH|RCC_AHB1Periph_GPIOG|RCC_AHB1Periph_GPIOI,ENABLE); //使能GPIOF、B、E、H、G、I的时钟
       
 	
 	GPIO_InitStructure.GPIO_Pin=GPIO_Pin_6|GPIO_Pin_8| GPIO_Pin_7|GPIO_Pin_9|GPIO_Pin_11;//F6、7、8、9、11
@@ -53,6 +53,7 @@ void LED_Init(void)
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_Init(GPIOB, &GPIO_InitStructure);
+        
         
         
 }

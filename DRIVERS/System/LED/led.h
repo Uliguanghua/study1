@@ -11,9 +11,9 @@
 #define LED3 PFout(9)
 #define LED_interrupt PEout(4)
 
-#define LED10 PGout(7)
-#define LED11 PGout(6)
-#define LED12 PHout(9)
+#define STA_LED0 PGout(7)
+#define STA_LED1 PGout(6)
+#define STA_LED2 PHout(9)
 #define LED13 PHout(8)
 #define LED14 PHout(7)
 #define LED15 PHout(6)
@@ -21,12 +21,6 @@
 
 #define LED5 PEout(6)
 #define LED6 PEout(5)
-
-
-
-#define LEDI3 PBin(4)
-#define LEDI6 PBin(6)
-#define LEDI7 PBin(7)
 
 
 void LED_Init(void);  //led≥ı ºªØ
