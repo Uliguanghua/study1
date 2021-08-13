@@ -1,5 +1,8 @@
 #include "includes.h"
 #include "led.h"
+#include "pwm.h"
+ 
+
 u32 My_Atoi(char *source) //字符串转整形
 {
 	int length = strlen(source); //计算长度
@@ -233,4 +236,37 @@ bool End_Check(u8 *recv_data)//结束指令有效性检测
    return false; 
 
 }
+
+void Output_Place(u32 data)//端子指定定时器初始化
+{
+
+  switch(data)
+  {
+  case 0:{//Y0输出
+            PWM_TIM10_Configuration();
+            CNT_TIM9_Configuration(TIM_TS_ITR2); 
+            
+  }break;
+  case 1:{//Y1输出
+            PWM_TIM13_Configuration();
+            CNT_TIM12_Configuration(TIM_TS_ITR2);
+      
+  }break;
+  case 2:{//Y2输出
+            PWM_TIM11_Configuration();
+            CNT_TIM9_Configuration(TIM_TS_ITR3);
+   
+  }break;
+  case 3:{//Y3输出
+           PWM_TIM14_Configuration();
+           CNT_TIM12_Configuration(TIM_TS_ITR3);
+        
+  }break;
+  
+  
+  }
+}
+
+
+
 
