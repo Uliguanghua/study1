@@ -1,5 +1,30 @@
 #include "pwm.h"
 
+/*****************************************定时器延时*********************************************/
+
+void Delay_TIM2_Configuration(void)
+{
+  TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
+
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+    
+    /* 时基 */         
+    TIM_TimeBaseStructure.TIM_Period = 100-1;
+    TIM_TimeBaseStructure.TIM_Prescaler = 840-1;
+    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
+    
+    TIM_ARRPreloadConfig(TIM2, ENABLE);
+    
+    /* 设置更新请求源只在计数器上溢或下溢时产生中断 */
+    TIM_UpdateRequestConfig(TIM2,TIM_UpdateSource_Global); 
+    TIM_ClearFlag(TIM2, TIM_FLAG_Update);
+}
+
+
+
+
+
 /******************************************* PWM输出 ********************************************/
 void PWM_TIM10_Configuration(void)
 {
@@ -88,7 +113,7 @@ void PWM_TIM13_Configuration(void)
   TIM_OCInitTypeDef       TIM_OCInitStructure;
 
 
-  RCC_APB2PeriphClockCmd(RCC_APB1Periph_TIM13, ENABLE);
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM13, ENABLE);
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOF, ENABLE);
 
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;//F8
@@ -199,7 +224,7 @@ void CNT_TIM12_Configuration(uint16_t TIM_TS_ITRx)
   TIM_ClearFlag(TIM12, TIM_FLAG_Update);
   TIM_ITConfig(TIM12, TIM_IT_Update, ENABLE);                     //使能"更新"中断
 
-  TIM_Cmd(TIM12, ENABLE);
+  TIM_Cmd(TIM12, DISABLE);
 }
 
 void CNT_TIM9_Configuration(uint16_t TIM_TS_ITRx)
@@ -232,7 +257,7 @@ void CNT_TIM9_Configuration(uint16_t TIM_TS_ITRx)
   TIM_ClearFlag(TIM9, TIM_FLAG_Update);
   TIM_ITConfig(TIM9, TIM_IT_Update, ENABLE);                     //使能"更新"中断
 
-  TIM_Cmd(TIM9, ENABLE);
+  TIM_Cmd(TIM9, DISABLE);
 }
 
 /************************************************
@@ -244,7 +269,7 @@ void PWM_Output(uint32_t Frequency, TIM_TypeDef * PWM_TIMx)//脉冲频率设置
   uint32_t pwm_pulse;
 
   /* 输出PWM */
-  pwm_period = PWM_CK_CNT/Frequency - 1;                               //计算出计数周期(决定输出的频率)
+  pwm_period = PWM_CK_CNT/Frequency - 1;                               //计算出计数周期(决定输出的频率)ARR
   pwm_pulse  = (pwm_period + 1)*50 / 100;                              //计算出脉宽值(决定PWM占空比)50%
 
 

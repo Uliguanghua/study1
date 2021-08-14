@@ -20,28 +20,28 @@
 u8 SendBuff[SEND_BUF_SIZE];//发送缓冲区
 u8 Rx_Buff[RECEIVE_BUF_SIZE];//接收缓冲区
 
-//variable
-
+/*********************模拟值***************/
 struct {
-  u8 Time_Register[100];//时间寄存器
+  u32 Time_Register[100];//时间寄存器
   u8 Signal_Register[100];//信号寄存器
   
   u8 time;//时间
   u8 signal;//信号
   u8 ext_signal;//外部信号
 
-}simulation;//模拟 
+}simulation;
 
-
+/*********************标志***************/
 struct{
   u8  current_state;//0:空闲状态    1：设置脉冲数状态    2：运行状态
   u8 rx_flag; //数据帧接收标志
   u8 task_flag;//任务标志位，1表示任务B运行，2表示任务C运行
   u8 send_finish_flag;//发送一段脉冲完成标志位
 
-}flag;//标志
+}flag;
 
 
+/*****************数据量****************/
 
 struct{
   //计量数据
@@ -61,21 +61,21 @@ struct{
   u16 mode;//脉冲段模式
   u32 data[600];//脉冲段数据
   
-}Volume;//数据量
-
+}Volume;
 
 
 u8 err_display[200]={"\r\n输入数据错误，请重新输入！"};
 
 
 
-u32 PWM_CK_CNT =10000;              
-u32 PWM_PRESCALER = (84000000/10000 - 1);  //预分频值
+u32 PWM_CK_CNT =10000;    //计数周期    10k/s      
+u16 PWM_PRESCALER = (84000000/10000 - 1);  //预分频值
 
 
 
 
 
+/**************任务堆栈********************/
 
 //开始任务
 #define START_TASK_PRIO			10  ///开始任务的优先级
@@ -122,24 +122,26 @@ void data_init()//数据初始化
   Volume.pulse_num=2;//两段脉冲
   
   Volume.CNT_TIMx=TIM9;
-  Volume.PWM_TIMx=TIM10;
+  Volume.PWM_TIMx=TIM10;//端子定时器指定
   Volume.pulse_offset[0]=1;
+  Volume.pulse_offset[1]=6;
   //两段脉冲，Y0输出，速率100和10，个数为1000和100个，等待模式为脉冲发送完成模式和等待时间模式，使用时间寄存器T1，时间为500ms跳转默认下段一
   Volume.data[0] = 0x00000002;
-  Volume.data[1] = 0x00000064;
-  Volume.data[2] = 0x000003E8;
+  Volume.data[1] = 0x0000000A;
+  Volume.data[2] = 0x00000064;
   Volume.data[3] = 0x00010000;
   Volume.data[4] = 0x00000000;
   Volume.data[5] = 0x00000000;
-  Volume.data[6] = 0x0000000A;
-  Volume.data[7] = 0x00000064;
+  Volume.data[6] = 0x00000002;
+  Volume.data[7] = 0x00000014;
   Volume.data[8] = 0x00020001;
   Volume.data[9] = 0x000001F4;
-  Volume.data[4] = 0x00000000;
+  Volume.data[10] = 0x00000001;
    
 }
 
-//void TimingDelay_Decrement(void);
+/**************函数声明*******************/
+
 u32 My_Atoi(char *source); //字符串转整形
 void My_Itoa (u16 num,char str[]);//整型转字符串
 void Led_Status(u8 state);//LED状态
@@ -156,5 +158,6 @@ bool Time_Check(u8 *recv_data);//时间有效性检测
 bool Section_Num_Check(u8 *recv_data,u16 sum);//跳转脉冲段序号有效性检测
 bool End_Check(u8 *recv_data);//结束指令有效性检测
 void Output_Place(u32 data);//端子指定定时器初始化
+void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,u32 frequency,u32 port);//频率选择
 
 #endif 

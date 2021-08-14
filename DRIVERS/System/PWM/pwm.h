@@ -4,16 +4,14 @@
 
 extern  u8  current_state;
 extern u32 PWM_CK_CNT;
-extern u32 PWM_PRESCALER;
-/* 宏定义 --------------------------------------------------------------------*/
-/* PWM输出 */
-
+extern u16 PWM_PRESCALER;
 
 /* 函数申明 ------------------------------------------------------------------*/
 void PWM_TIM10_Configuration(void);
 void PWM_TIM11_Configuration(void);
 void PWM_TIM13_Configuration(void);
 void PWM_TIM14_Configuration(void);
+void Delay_TIM2_Configuration(void);
 
 void CNT_TIM9_Configuration(uint16_t TIM_TS_ITRx);
 void CNT_TIM12_Configuration(uint16_t TIM_TS_ITRx);

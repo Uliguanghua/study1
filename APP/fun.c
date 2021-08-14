@@ -267,6 +267,61 @@ void Output_Place(u32 data)//端子指定定时器初始化
   }
 }
 
+void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,u32 frequency,u32 port)//根据脉冲频率设置寄存器值
+{
+
+   if(port == 0 || port == 2)
+   {
+      if(frequency > 1000)
+     {
+          if(frequency > 100000)
+          {
+              *PWM_CK_CNT =4000000 ;               
+              *PWM_PRESCALER = (168000000/4000000 - 1);  //预分频值
+               TIM_PrescalerConfig(PWM_TIMx, *PWM_PRESCALER, TIM_PSCReloadMode_Immediate);//立即更新预分频参数
+              
+           }else
+          {
+              *PWM_CK_CNT =1000000 ;               
+              *PWM_PRESCALER = (168000000/1000000 - 1);  //预分频值
+               TIM_PrescalerConfig(PWM_TIMx, *PWM_PRESCALER, TIM_PSCReloadMode_Immediate);//立即更新预分频参数
+           }
+                 
+      }else
+      {             
+              *PWM_CK_CNT =10000 ;               
+              *PWM_PRESCALER = (168000000/10000 - 1);  //预分频值
+               TIM_PrescalerConfig(PWM_TIMx, *PWM_PRESCALER, TIM_PSCReloadMode_Immediate);//立即更新预分频参数
+      }
+      
+   }else
+   {
+      if(frequency > 1000)
+     {
+          if(frequency > 100000)
+          {
+              *PWM_CK_CNT =4000000 ;               
+              *PWM_PRESCALER = (84000000/4000000 - 1);  //预分频值
+               TIM_PrescalerConfig(PWM_TIMx, *PWM_PRESCALER, TIM_PSCReloadMode_Immediate);//立即更新预分频参数
+           }else
+          {
+              *PWM_CK_CNT =1000000 ;               
+              *PWM_PRESCALER = (84000000/1000000 - 1);  //预分频值
+               TIM_PrescalerConfig(PWM_TIMx, *PWM_PRESCALER, TIM_PSCReloadMode_Immediate);//立即更新预分频参数
+           }
+                 
+      }else
+      {             
+              *PWM_CK_CNT =10000 ;               
+              *PWM_PRESCALER = (84000000/10000 - 1);  //预分频值
+               TIM_PrescalerConfig(PWM_TIMx, *PWM_PRESCALER, TIM_PSCReloadMode_Immediate);//立即更新预分频参数
+      }
+   
+   }
+
+}
+
+
 
 
 

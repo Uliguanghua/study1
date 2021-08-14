@@ -7,7 +7,7 @@
 
 //char USART_ReceiveString[50];									//接收PC端发送过来的字符										//接收消息标志位
 //int Receive_sum = 0; //数组下标
-//u32  frequency= 10; //脉冲频率
+//
 	
 RCC_ClocksTypeDef get_rcc_clock;
 
@@ -18,12 +18,14 @@ int main(void)
         
         NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//系统中断优先级分组
         
+        
         SystemInit();          //时钟初始化
 	delay_init(168);     //延时初始化       
         LED_Init();          //LED初始化
 	OSInit();          //UCOS初始化        
 	uart_init(9600);	//串口初始化
         data_init();//参数初始化
+        Delay_TIM2_Configuration();//计数定时器初始化
         MYDMASEND_Config((u32)&(USART1->DR),(u32)SendBuff,SEND_BUF_SIZE);//DMA发送初始化
         MYDMAREC_Config((u32)&(USART1->DR),(u32)Rx_Buff,RECEIVE_BUF_SIZE);//DMA接收初始化
        
@@ -78,10 +80,28 @@ void Led_Task_A(void *pdata)
               break; 
              }
          }
-          
+     if(0 == strcmp((char const *)SendBuff,"exit"))//退出设置模式   
+     {
+        Volume.recv_times=0;
+        flag.current_state=0;
+        flag.task_flag=0;
+        Led_Status(flag.current_state);
+        Led_Status(flag.current_state);//空闲模式灯亮	
+        u8 start[]={"请输入指令切换状态：go_set切换到设置状态，go_start切换到运行状态\r\n"};
+        strcpy((char *)SendBuff,(const char*)start);
+        Volume.recv_len = strlen((const char *)SendBuff); 
+        MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
+        while(1)
+	 {
+            if(DMA_GetFlagStatus(DMA2_Stream7,DMA_FLAG_TCIF7)!=RESET)
+            { 
+              DMA_ClearFlag(DMA2_Stream7,DMA_FLAG_TCIF7);
+              break; 
+             }
+         }
+     }
                                                           
-        
-    if(0 == strcmp((char const *)SendBuff,"go_set") && 0==Volume.recv_times)//进入设置模式
+     else if(0 == strcmp((char const *)SendBuff,"go_set") && 0==Volume.recv_times)//进入设置模式
     {
       Volume.recv_times=1;//第一次接收到有效数据
       flag.current_state=1;
@@ -547,44 +567,88 @@ void Led_Task_C(void *pdata)
       Output_Place(Volume.data[0]>>16);//端子指定
       Volume.pulse_num=Volume.data[0]&0x0000FFFF;//总段数
    
-      while(Volume.pulse_num > 0)
+      while(Volume.sd+1 <= Volume.pulse_num)
       {
-        if(Volume.data[Volume.pulse_offset[Volume.sd]+1] > 65535)//判断脉冲个数
+        
+        switch(Volume.data[Volume.pulse_offset[Volume.sd]+2]>>16)//判断模式
         {
-          Volume.interruput_times = Volume.data[Volume.pulse_offset[Volume.sd]+1] / 65535;
-          Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1] % 65535;
-        }else
-        {
-          Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1];
+        case 1:{
+                  if(Volume.data[Volume.pulse_offset[Volume.sd]+1] > 65535)//判断脉冲个数
+                  {
+                    Volume.interruput_times = Volume.data[Volume.pulse_offset[Volume.sd]+1] / 65535;
+                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1] % 65535;
+                  }else
+                  {
+                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1];
+                  }
+                
+                
+                  if(Volume.interruput_times > 0)
+                  {
+                    Pulse_Output_Number(65535,Volume.CNT_TIMx);
+                  }     
+                  else
+                  {
+                    Pulse_Output_Number(Volume.pulse_remainder,Volume.CNT_TIMx);
+                  }
+                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[Volume.sd]],Volume.data[0]>>16);//根据频率设定寄存器值
+                    PWM_Output(Volume.data[Volume.pulse_offset[Volume.sd]],Volume.PWM_TIMx);//脉冲输出
+                    while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
+                 
+        };break;
+        case 2:{
+                  if(Volume.data[Volume.pulse_offset[Volume.sd]+1] > 65535)//判断脉冲个数
+                  {
+                    Volume.interruput_times = Volume.data[Volume.pulse_offset[Volume.sd]+1] / 65535;
+                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1] % 65535;
+                  }else
+                  {
+                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1];
+                  }
+                
+                
+                  if(Volume.interruput_times > 0)
+                  {
+                    Pulse_Output_Number(65535,Volume.CNT_TIMx);
+                  }     
+                  else
+                  {
+                    Pulse_Output_Number(Volume.pulse_remainder,Volume.CNT_TIMx);
+                  }
+                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[Volume.sd]],Volume.data[0]>>16);//根据频率设定寄存器值
+                    PWM_Output(Volume.data[Volume.pulse_offset[Volume.sd]],Volume.PWM_TIMx);//脉冲输出
+                    while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
+                    
+                    u32 temp_register=Volume.data[Volume.pulse_offset[Volume.sd]+2]&0x0000FFFF;
+                    simulation.Time_Register[temp_register-1]=Volume.data[Volume.pulse_offset[Volume.sd]+3];
+                    Delay_ms(simulation.Time_Register[temp_register-1]);
+        };break;
+        case 3:{
+          
+        };break;
+        case 4:{};break;
+        case 5:{};break;
+        case 6:{};break;
         }
-      
-      
-        if(Volume.interruput_times > 0)
-        {
-          Pulse_Output_Number(65535,Volume.CNT_TIMx);
-        }     
+       
+          
+        if(Volume.data[Volume.pulse_offset[Volume.sd]+4] == 0)
+          Volume.sd++;
         else
         {
-          Pulse_Output_Number(Volume.pulse_remainder,Volume.CNT_TIMx);
+          Volume.sd = Volume.data[Volume.pulse_offset[Volume.sd]+4]-1;
         }
-          PWM_Output(Volume.data[Volume.pulse_offset[Volume.sd]],Volume.PWM_TIMx);//脉冲输出
-          while(flag.send_finish_flag == 0)//循环等待到一段脉冲发送完成
-         {
-            
-         }
-          
         
-        Volume.sd++;
-        Volume.pulse_num--;
-        
+        flag.send_finish_flag=0;
       }
       
-      
+      Volume.recv_times=0;
+      flag.task_flag=0;
+      flag.current_state=0;
     }
     //OSTaskSuspend(OS_PRIO_SELF);//挂起自身任务
-    flag.task_flag=0;
-    flag.current_state=0;
-    Volume.recv_times=0;
+    
+    
     delay_ms(20);
   }
 }
