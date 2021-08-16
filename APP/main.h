@@ -14,25 +14,26 @@
 #include "pwm.h"
 #include "dma.h"
 
+
+
 #define SEND_BUF_SIZE 200  //发送缓冲区长度
-#define RECEIVE_BUF_SIZE 200 // 接收缓冲区长度
+#define RECEIVE_BUF_SIZE 650 // 接收缓冲区长度
 
 u8 SendBuff[SEND_BUF_SIZE];//发送缓冲区
 u8 Rx_Buff[RECEIVE_BUF_SIZE];//接收缓冲区
 
+OS_EVENT* DATA_MBOX;//邮箱
+
 /*********************模拟值***************/
-struct {
-  u32 Time_Register[100];//时间寄存器
-  u8 Signal_Register[100];//信号寄存器
+struct S{
   
   u8 time;//时间
-  u8 signal;//信号
   u8 ext_signal;//外部信号
 
 }simulation;
 
 /*********************标志***************/
-struct{
+struct F{
   u8  current_state;//0:空闲状态    1：设置脉冲数状态    2：运行状态
   u8 rx_flag; //数据帧接收标志
   u8 task_flag;//任务标志位，1表示任务B运行，2表示任务C运行
@@ -43,7 +44,7 @@ struct{
 
 /*****************数据量****************/
 
-struct{
+struct V{
   //计量数据
   u16 UART1_ReceiveSize; //DMA接收数据的长度
   u16 recv_len; //发送数据实际长度
@@ -55,11 +56,13 @@ struct{
   //参数数据
   u8 sd;//当前数据段数
   u16 pulse_remainder;//脉冲余数
-  u8 pulse_offset[100];//每一段的起始位（偏移量）
+  u8 pulse_offset[20];//每一段的起始位（偏移量）
   u32 pulse_num;//总脉冲段数，默认两段脉冲
   u32 output_port;//输出端子，默认为0
   u16 mode;//脉冲段模式
-  u32 data[600];//脉冲段数据
+  u32 data[101];//脉冲段数据
+  u8 pulse_data[21][31];//脉冲数据指令
+  
   
 }Volume;
 
@@ -95,7 +98,7 @@ OS_STK LED0_TASK_STK[LED0_STK_SIZE];
 //任务函数
 void Led_Task_A(void *pdata);
 
-//LEDB任务
+//设置任务
 //设置任务优先级
 #define LED1_TASK_PRIO			5
 //设置任务堆栈大小
@@ -106,7 +109,7 @@ OS_STK LED1_TASK_STK[LED1_STK_SIZE];
 void Led_Task_B(void *pdata);
 
 
-//LEDC任务
+//运行任务
 //设置任务优先级
 #define LED2_TASK_PRIO			6
 //设置任务堆栈大小
@@ -115,6 +118,16 @@ void Led_Task_B(void *pdata);
 OS_STK LED2_TASK_STK[LED2_STK_SIZE];
 //任务函数
 void Led_Task_C(void *pdata);
+
+//数据处理任务
+//设置任务优先级
+#define DATA_TASK_PRIO			3
+//设置任务堆栈大小
+#define DATA_STK_SIZE			512
+//任务堆栈
+OS_STK DATA_TASK_STK[DATA_STK_SIZE];
+//任务函数
+void DATA_Task(void *pdata);
 
 
 void data_init()//数据初始化
@@ -159,5 +172,6 @@ bool Section_Num_Check(u8 *recv_data,u16 sum);//跳转脉冲段序号有效性检测
 bool End_Check(u8 *recv_data);//结束指令有效性检测
 void Output_Place(u32 data);//端子指定定时器初始化
 void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,u32 frequency,u32 port);//频率选择
+void Print_Mode_Switch(u8 * send_data);//数据打印
 
 #endif 

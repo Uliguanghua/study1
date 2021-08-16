@@ -72,7 +72,7 @@ void MYDMAREC_Config(u32 par,u32 mar,u16 ndtr)
     /* 6. 由于接收不需要DMA中断，故不能配置DMA中断优先级 */
 
     /* 7.使能DMA */ 
-    DMA_Cmd(DMA2_Stream2,ENABLE);
+   DMA_Cmd(DMA2_Stream2,ENABLE);
 }
 
 //开启一次DMA传输

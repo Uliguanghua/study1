@@ -28,6 +28,8 @@ int main(void)
         Delay_TIM2_Configuration();//计数定时器初始化
         MYDMASEND_Config((u32)&(USART1->DR),(u32)SendBuff,SEND_BUF_SIZE);//DMA发送初始化
         MYDMAREC_Config((u32)&(USART1->DR),(u32)Rx_Buff,RECEIVE_BUF_SIZE);//DMA接收初始化
+        
+        DATA_MBOX=OSMboxCreate((void*)0);//建立消息邮箱
        
 	OSTaskCreate(Start_Task,(void*)0,(OS_STK*)&START_TASK_STK[START_STK_SIZE-1],START_TASK_PRIO); //创建开始任务
 	OSStart(); //开始任务
@@ -43,7 +45,7 @@ void Start_Task(void *pdata)
 	OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
 	OSTaskCreate(Led_Task_A,(void*)0,(OS_STK*)&LED0_TASK_STK[LED0_STK_SIZE-1],LED0_TASK_PRIO);//创建LEDA任务
         OSTaskCreate(Led_Task_B,(void*)0,(OS_STK*)&LED1_TASK_STK[LED1_STK_SIZE-1],LED1_TASK_PRIO);//创建LEDB任务
-         OSTaskCreate(Led_Task_C,(void*)0,(OS_STK*)&LED2_TASK_STK[LED2_STK_SIZE-1],LED2_TASK_PRIO);//创建LEDC任务
+        OSTaskCreate(Led_Task_C,(void*)0,(OS_STK*)&LED2_TASK_STK[LED2_STK_SIZE-1],LED2_TASK_PRIO);//创建LEDC任务
 	OSTaskSuspend(START_TASK_PRIO);//挂起开始任务
 	OS_EXIT_CRITICAL();  //退出临界区(开中断)
 }
@@ -51,28 +53,19 @@ void Start_Task(void *pdata)
 //任务A---空闲状态
 void Led_Task_A(void *pdata)
 {       
-      Led_Status(flag.current_state);//空闲模式灯亮	
-      u8 start[]={"请输入指令切换状态：go_set切换到设置状态，go_start切换到运行状态\r\n"};
-      strcpy((char *)SendBuff,(const char*)start);
-      Volume.recv_len = strlen((const char *)SendBuff); 
-      MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
-       while(1)
-	 {
-            if(DMA_GetFlagStatus(DMA2_Stream7,DMA_FLAG_TCIF7)!=RESET)
-            { 
-              DMA_ClearFlag(DMA2_Stream7,DMA_FLAG_TCIF7);
-              break; 
-             }
-         }
-  
-  while(1)
-  {
-    if(flag.rx_flag)                                 															//?óê?μ?ò???êy?Y
-    {
+      Led_Status(flag.current_state);//空闲模式灯亮
+      u8 start[]={"请输入指令切换状态：go_set切换到设置状态，go_start切换到运行状态\r\n"}; 
+      Print_Mode_Switch(start);//打印模式信息
+      OSTaskCreate(DATA_Task,(void*)0,(OS_STK*)&DATA_TASK_STK[DATA_STK_SIZE-1],DATA_TASK_PRIO);//创建数据处理任务
+      
+     while(1)
+     {
+      if(flag.rx_flag)                                 															//?óê?μ?ò???êy?Y
+      {
       flag.rx_flag = 0;  //清除接收标志位
-      Volume.recv_len = strlen((const char *)SendBuff); //回显
-      MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
-       while(1)
+    /*  Volume.recv_len = strlen((const char *)SendBuff); //回显
+        MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
+        while(1)
 	 {
             if(DMA_GetFlagStatus(DMA2_Stream7,DMA_FLAG_TCIF7)!=RESET)
             { 
@@ -85,20 +78,11 @@ void Led_Task_A(void *pdata)
         Volume.recv_times=0;
         flag.current_state=0;
         flag.task_flag=0;
-        Led_Status(flag.current_state);
+
         Led_Status(flag.current_state);//空闲模式灯亮	
-        u8 start[]={"请输入指令切换状态：go_set切换到设置状态，go_start切换到运行状态\r\n"};
-        strcpy((char *)SendBuff,(const char*)start);
-        Volume.recv_len = strlen((const char *)SendBuff); 
-        MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
-        while(1)
-	 {
-            if(DMA_GetFlagStatus(DMA2_Stream7,DMA_FLAG_TCIF7)!=RESET)
-            { 
-              DMA_ClearFlag(DMA2_Stream7,DMA_FLAG_TCIF7);
-              break; 
-             }
-         }
+        u8 mode[]={"\r\n请输入指令切换状态：go_set切换到设置状态，go_start切换到运行状态\r\n"};
+        Print_Mode_Switch(mode);//打印信息
+        
      }
                                                           
      else if(0 == strcmp((char const *)SendBuff,"go_set") && 0==Volume.recv_times)//进入设置模式
@@ -134,7 +118,7 @@ void Led_Task_A(void *pdata)
       
       MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
        while(1)
-	 {
+        {
             if(DMA_GetFlagStatus(DMA2_Stream7,DMA_FLAG_TCIF7)!=RESET)
             { 
               DMA_ClearFlag(DMA2_Stream7,DMA_FLAG_TCIF7);
@@ -142,11 +126,11 @@ void Led_Task_A(void *pdata)
             }
          }
     }
-    
+    */
   }
     Led_Status(flag.current_state);//空闲模式灯亮
-    delay_ms(20);
-  //  OSTaskSuspend(OS_PRIO_SELF);//挂起自身任务
+    //delay_ms(20);
+    OSTaskSuspend(OS_PRIO_SELF);//挂起自身任务
 
   } 
        
@@ -400,8 +384,8 @@ void Led_Task_B(void *pdata)
          {
            if(Signal_Register_Check(SendBuff))
            {
-             simulation.signal=(u8)My_Atoi((char *)SendBuff);//信号寄存器序号存储
-             Volume.data[Volume.pulse_offset[Volume.sd]+2] = 0x00030000+simulation.signal;//数据保存
+             simulation.ext_signal=(u8)My_Atoi((char *)SendBuff);//信号寄存器序号存储
+             Volume.data[Volume.pulse_offset[Volume.sd]+2] = 0x00030000+simulation.ext_signal;//数据保存
              Volume.data[Volume.pulse_offset[Volume.sd]+3] = 0;
              
              u8 speed_clue[]={"\r\n请输入要跳转到的段序号（0是默认下一段，段序号要小于等于总段数且要避免死循环）\r\n"};
@@ -619,9 +603,7 @@ void Led_Task_C(void *pdata)
                     PWM_Output(Volume.data[Volume.pulse_offset[Volume.sd]],Volume.PWM_TIMx);//脉冲输出
                     while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
                     
-                    u32 temp_register=Volume.data[Volume.pulse_offset[Volume.sd]+2]&0x0000FFFF;
-                    simulation.Time_Register[temp_register-1]=Volume.data[Volume.pulse_offset[Volume.sd]+3];
-                    Delay_ms(simulation.Time_Register[temp_register-1]);
+                    Delay_ms(Volume.data[Volume.pulse_offset[Volume.sd]+3]);
         };break;
         case 3:{
           
@@ -653,14 +635,53 @@ void Led_Task_C(void *pdata)
   }
 }
 
+//数据处理任务
+void DATA_Task(void *pdata)
+{
+  //result= *((u8 *)OSMboxPend(Str_Box,0,&err)); //请求消息邮箱
+  if(1==flag.rx_flag)
+  {
+    switch(flag.current_state)//判断当前状态
+    {
+    case 0:{//空闲
+      if(0 == strcmp((char const *)SendBuff,"go_set"))//进入设置模式
+      {
+        flag.current_state=1;
+        Led_Status(flag.current_state);//模式灯亮
+           
+        memset(Rx_Buff,0,650);//清空接收数据缓冲区
+        OSTaskResume(5);//恢复任务B
+      }
+      else if(0 == strcmp((char const *)SendBuff,"go_start") && 0==Volume.recv_times)//进入运行模式
+      {
+       Volume.recv_times=1;//第一次接收到有效数据
+       flag.current_state=2;
+       flag.task_flag=2;
+      // OSTaskResume(6);//恢复任务C
+      }
+    };break;
+    case 1:{//设置
+    };break;
+    case 2:{//运行
+    };break;
+    
+    
+    }
+    
+    flag.rx_flag = 0;
+    DMA_Cmd(DMA2_Stream2, ENABLE);     //打开DMA,数据处理完成后接收数据通道开启
+  }
+  OSTaskSuspend(OS_PRIO_SELF);//挂起自身任务
+}
+
 
 void USART1_IRQHandler(void)//串口空闲中断
 {
-        u16 temp;
+        volatile u16 temp;
         if(USART_GetITStatus(USART1,USART_IT_IDLE) != RESET)
         {
                 DMA_Cmd(DMA2_Stream2, DISABLE); //关闭DMA,防止处理其间有数据
-
+                
                 temp = USART1->SR;
                 temp = USART1->DR;//清除IDLE标志位
                
@@ -670,20 +691,15 @@ void USART1_IRQHandler(void)//串口空闲中断
                 
                 if(Volume.UART1_ReceiveSize !=0)//接收数据长度不为0
                 {
-                        flag.rx_flag=1;  //数据帧接收标志位置为1
-                        
-                      memset(SendBuff,0,SEND_BUF_SIZE);//清空接收缓冲区
-                      for(temp=0;temp<Volume.UART1_ReceiveSize;temp++)
-                      {
-                      SendBuff[temp]= Rx_Buff[temp]; 
-                      }
-                      memset(Rx_Buff,0,Volume.UART1_ReceiveSize);//清空接收缓冲区
-                      //OSTaskResume(4);
+                      flag.rx_flag=1;  //数据帧接收标志位置为1
+                                             
+                      OSTaskResume(3);//恢复数据处理任务
                 }
                 DMA_ClearFlag(DMA2_Stream2,DMA_FLAG_TCIF2 | DMA_FLAG_FEIF2 | DMA_FLAG_DMEIF2 | DMA_FLAG_TEIF2 | DMA_FLAG_HTIF2);//清除传输完成标志
                 DMA_SetCurrDataCounter(DMA2_Stream2, RECEIVE_BUF_SIZE);
-                DMA_Cmd(DMA2_Stream2, ENABLE);     //打开DMA
+                //DMA_Cmd(DMA2_Stream2, ENABLE);     //打开DMA
         }
+        
 }
 
 

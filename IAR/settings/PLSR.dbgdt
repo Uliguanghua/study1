@@ -985,7 +985,7 @@
                     <item>Volume.pulse_num</item>
                     <item>Volume.data[Volume.pulse_offset[Volume.sd]+1]</item>
                     <item>Volume.sd</item>
-                    <item></item>
+                    <item />
                 </expressions>
                 <col-names>
                     <item>Expression</item>

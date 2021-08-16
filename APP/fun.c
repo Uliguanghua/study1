@@ -1,11 +1,41 @@
 #include "includes.h"
 #include "led.h"
 #include "pwm.h"
+#include "DMA.h"
  
+extern u8 SendBuff[200];//发送缓冲区
+extern u8 Rx_Buff[650];//接收缓冲区
 
-u32 My_Atoi(char *source) //字符串转整形
+struct V{
+  //计量数据
+  u16 UART1_ReceiveSize; //DMA接收数据的长度
+  u16 recv_len; //发送数据实际长度
+  u8  recv_times;//接收数据次数
+  u8  interruput_times;//计数器中断次数 
+  TIM_TypeDef * CNT_TIMx;//计数定时器
+  TIM_TypeDef * PWM_TIMx;//PWM定时器
+
+  //参数数据
+  u8 sd;//当前数据段数
+  u16 pulse_remainder;//脉冲余数
+  u8 pulse_offset[20];//每一段的起始位（偏移量）
+  u32 pulse_num;//总脉冲段数，默认两段脉冲
+  u32 output_port;//输出端子，默认为0
+  u16 mode;//脉冲段模式
+  u32 data[600];//脉冲段数据
+  u8 pulse_data[21][31];//脉冲数据指令
+  
+};
+
+extern struct V Volume;
+
+
+u32 My_Atoi(char *source) //字符串转整形,遇到第一个非数字停止
 {
-	int length = strlen(source); //计算长度
+        
+	int length = 0 ; //计算长度
+         while(source[length] >= '0' && source[length] <= '9')
+          length++;
 	u32 temp_sum = 0;
 	for(int tmp=0;tmp<length;tmp++) 
           temp_sum = (source[tmp]-'0')+ (temp_sum*10) ; //字符转数字并合并
@@ -56,7 +86,7 @@ void Led_Status(u8 state)//LED 状态
           STA_LED2=1;};break;
   }
 }
-
+/*
 bool Output_Check(u8 *recv_data)//输出端子有效性检测
 {
   u8 data_len=strlen((char *)recv_data);
@@ -71,34 +101,37 @@ bool Output_Check(u8 *recv_data)//输出端子有效性检测
 
 bool Number_Sum_Check(u8 *recv_data)//总脉冲段数有效性检测
 {
-  u8 data_len=strlen((char *)recv_data);
-  if(data_len > 3)//长度检查
-    return false;
-  u8 temp;
-  for(temp=0;temp<data_len;temp++)
+  u8 data_len=0;
+  while(*recv_data >='0' && *recv_data <= '9')
   {
-    if(recv_data[temp]>'9' || recv_data[temp]<'0')
-      return false;
+    data_len++;
+    recv_data++;
   }
+          
+  if(data_len > 2 || data_len == 0)//长度检查
+    return false;
+  
   u32 data=My_Atoi((char *)recv_data);
-  if(data > 100 || data == 0)
+  if(data > 20 || data == 0)
     return false;
   return true;
 }
-
+*/
 
 bool Speed_Check(u8 *recv_data)//脉冲数率有效性检测
 {
-  u8 data_len=strlen((char *)recv_data);
-  if(data_len > 6)//长度检查
+  u8 * p = recv_data;
+  u8 data_len=strlen((char *)p);
+  if(data_len > 6 || data_len == 0)//长度检查
     return false;
   u8 temp;
   for(temp=0;temp<data_len;temp++)
   {
-    if(recv_data[temp]>'9' || recv_data[temp]<'0')
+    if(*p> '9' || *p <'0')
       return false;
+    p++;
   }
-  u32 data=My_Atoi((char *)recv_data);
+  u32 data=My_Atoi((char *)p);
   if(data > 200000 || data == 0)
     return false;
   return true;
@@ -107,18 +140,23 @@ bool Speed_Check(u8 *recv_data)//脉冲数率有效性检测
 
 bool Number_Check(u8 *recv_data)//脉冲个数有效性检测
 {
-  u8 temp;
-  u8 data_len=strlen((char *)recv_data);
+  u8 *p = recv_data;
+  u8 temp=0;
+  u8 data_len=strlen((char *)p);
   if(data_len>10 || data_len==0)
-    
-  for(temp=0;temp<data_len;temp++)
+    return false;
+  if(data_len ==10 && *p > '2')
+    return false;
+  
+  for(;temp<data_len;temp++)
   {
-    if(recv_data[temp]>'9' || recv_data[temp]<'0' || recv_data[0]>'2')
+    if(*p > '9' || *p < '0')
       return false;
+    p++;
   }
   
   
-  u32 data=My_Atoi((char *)recv_data);
+  u32 data=My_Atoi((char *)p);
   if(data > 2147483647 || data == 0)
     return false;
   return true;
@@ -127,13 +165,11 @@ bool Number_Check(u8 *recv_data)//脉冲个数有效性检测
 
 bool Mode_Check(u8 *recv_data)//脉冲模式有效性检测
 {
-  
-  if(0 == strcmp((char const *)recv_data,"wait_time") || 0 == strcmp((char const *)recv_data,"finish") || 0 == strcmp((char const *)recv_data,"wait_signal")
-     || 0 == strcmp((char const *)recv_data,"act_time") || 0 == strcmp((char const *)recv_data,"ext_signal") || 0 == strcmp((char const *)recv_data,"ext_finish"))
-    
+  if('F' == *recv_data || 'T' == *recv_data || 'S' == *recv_data || 'A' == *recv_data || 'E' == *recv_data || 
+      'X' == *recv_data )
+    if('\0' == *(recv_data+1))
     return true;
-  return false;
-  
+  return false; 
 }
 
 bool Time_Register_Check(u8 *recv_data)//时间寄存器有效性检测
@@ -189,45 +225,54 @@ bool External_Signal_Check(u8 *recv_data)//外部信号端子有效性检测
 
 bool Time_Check(u8 *recv_data)//时间有效性检测
 {
-  u8 data_len=strlen((char *)recv_data);
-  if(data_len > 5)//长度检查
+  u8 *p=recv_data;
+  
+  u8 data_len=strlen((char *)p);
+  if(data_len > 5 || data_len==0)//长度检查
     return false;
-  u8 temp;
-  for(temp=0;temp<data_len;temp++)
+  u8 temp=0;
+  for(;temp<data_len;temp++)
   {
-    if(recv_data[temp]>'9' || recv_data[temp]<'0')//数字检查
+    if(*p > '9' || *p < '0')//数字检查
       return false;
+    p++;
   }
-  u32 data=My_Atoi((char *)recv_data);
+  u32 data=My_Atoi((char *)p);
   if(data > 65535|| data == 0)//数值检查
     return false;
   
    return true; 
 }
 
-bool Section_Num_Check(u8 *recv_data,u16 sum)//跳转脉冲段序号有效性检测
+bool Section_Num_Check(u8 *recv_data)//跳转脉冲段序号有效性检测
 {
-  u8 data_len=strlen((char *)recv_data);
-  if(data_len > 3 || data_len ==0)//长度检查
+  u8 * p = recv_data;
+  u8 data_len=0;
+  while(*p < '9' && *p > '0')
+  {
+    p++;
+    data_len++;
+  }
+    p = recv_data;//重置位置
+    
+  if(data_len > 2 || data_len == 0)//长度检查
     return false;
   
-  u8 temp;
-  for(temp=0;temp<data_len;temp++)
+  u8 temp=0;
+  for(;temp<data_len;temp++)
   {
-    if(recv_data[temp]>'9' || recv_data[temp]<'0')//数字检查
+    if(*p > '9' || *p < '0')//数字检查
       return false;
+    p++;
   }
   
-  u32 data=My_Atoi((char *)recv_data);
-  if(data > sum)//数值检查
+  u32 data=My_Atoi((char *)p);
+  if(data > Volume.pulse_num)//数值检查
     return false;
   
    return true; 
-
 }
 
-bool End_Check(u8 *recv_data)//结束指令有效性检测
-{
  
     if(0 == strcmp((char const *)recv_data,"set_end"))
 
@@ -321,7 +366,165 @@ void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,
 
 }
 
+void Print_Mode_Switch(u8 * send_data)//数据打印
+{
+  
+      strcpy((char *)SendBuff,(const char*)send_data);
+      Volume.recv_len = strlen((const char *)SendBuff); 
+      MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
+       while(1)
+	 {
+            if(DMA_GetFlagStatus(DMA2_Stream7,DMA_FLAG_TCIF7)!=RESET)
+            { 
+              DMA_ClearFlag(DMA2_Stream7,DMA_FLAG_TCIF7);
+              break; 
+             }
+         }
+}
+
+bool Data_Head_Check(u8 *p)//数据头
+{
+  //数据头
+  if(Rx_Buff[0] == 'H')
+  {
+    p++;
+    if(Rx_Buff[1] == '-')
+    {
+      p++;
+      if(Rx_Buff[2] == 'Y')
+      {
+        p++;
+        if(Rx_Buff[3] > '0' && Rx_Buff[3] < '4')
+        {
+          p++;
+          if(Rx_Buff[1] == '-')
+          {
+             p++;
+             if(Number_Sum_Check(p))
+             {
+              p++;
+                if(*p == '\r' && *(p+1) == '\n')
+                {
+                  p+=2;
+                  return true;
+                }               
+                else 
+                  return false;
+             }else
+               return false;
+               
+          }else
+            return false;
+           
+        }else
+          return false;
+          
+      }else
+        return false;
+        
+    }else
+       return false;     
+  }          
+  else
+    return false;
+
+}
+
+u8 Pulse_Data(u8 *p)//数据段错误判断，正确返回0，错误返回非0值
+{
+  if(!Speed_Check(p))
+    return 1;
+  
+  else
+  {
+    p=p+strlen((const char *)p)+1;
+    if(!Number_Check(p))
+    return 1;
+    
+    else
+    {
+      p=p+strlen((const char *)p)+1;
+      if(!Mode_Check(p))//模式判断
+        return 1;
+      else
+      {
+        switch(*p)
+        {
+          case 'F':{
+            p=p+strlen((const char *)p)+1;
+            if(!Section_Num_Check(p))
+              return 1;
+            else 
+            {
+              while(*p < '9' && *p > '0')
+                p++;
+              if(*p == '\r' && *(p+1) == '\n')
+              {
+                p+=2;
+                return Pulse_Data(p);//跑下一段
+              }
+               
+            }
+             
+          };break;
+        case 'T':{
+            p=p+strlen((const char *)p)+1;
+            if(!Time_Check(p))
+              return 1;
+            
+            
+          };break;
+          case 'S':{
+            p=p+strlen((const char *)p)+1;
+          };break;
+          case 'A':{
+            p=p+strlen((const char *)p)+1;
+          };break;
+          case 'E':{
+            p=p+strlen((const char *)p)+1;
+          };break;
+          case 'X':{
+            p=p+strlen((const char *)p)+1;
+          };break;
+         
+        }
+        
+        
+      }
+    }
+  
+  }
+
+  
+}
+
+bool Data_Format_Check(u8 *p)//数据格式判断
+{
+  if(!Data_Head_Check(p))//数据头判断
+    return false;
+  u16 data_len = strlen((const char *) p);//数据长度
+  u16 temp = 0;
+  u8 * str=p;
+  for(;temp<data_len;temp++)//数据分隔符替换为0
+  {
+    if(*str == '-')
+      *str = 0;
+    str++;
+  }
+  
+    
+}
 
 
-
-
+u8 Data_Check(void)//数据帧校验,长度错误返回1，格式错误返回2，数据错误返回3，正确返回0
+{
+  u8 len =strlen((char const*)Rx_Buff);//接收数据长度
+  if(len < 15 || len > 607)//长度
+    return 1;
+  u8 *p=Rx_Buff;
+  
+ if(!Data_Format_Check())
+ return 2;
+ 
+  return 0;
+}
