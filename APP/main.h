@@ -67,7 +67,7 @@ struct V{
 }Volume;
 
 
-u8 err_display[200]={"\r\n输入数据错误，请重新输入！"};
+
 
 
 
@@ -173,5 +173,6 @@ bool End_Check(u8 *recv_data);//结束指令有效性检测
 void Output_Place(u32 data);//端子指定定时器初始化
 void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,u32 frequency,u32 port);//频率选择
 void Print_Mode_Switch(u8 * send_data);//数据打印
-
+u8 Data_Check(void);//数据帧校验,错误返回错误号，正确返回0
+void Data_Save(void);//数据保存
 #endif 

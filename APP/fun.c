@@ -23,7 +23,6 @@ struct V{
   u32 output_port;//输出端子，默认为0
   u16 mode;//脉冲段模式
   u32 data[600];//脉冲段数据
-  u8 pulse_data[21][31];//脉冲数据指令
   
 };
 
@@ -98,25 +97,27 @@ bool Output_Check(u8 *recv_data)//输出端子有效性检测
     
   return true;
 }
-
+*/
 bool Number_Sum_Check(u8 *recv_data)//总脉冲段数有效性检测
 {
+  u8 *p = recv_data;
   u8 data_len=0;
-  while(*recv_data >='0' && *recv_data <= '9')
+  while(*p >='0' && *p <= '9')
   {
     data_len++;
-    recv_data++;
+    p++;
   }
-          
+  p = recv_data;        
   if(data_len > 2 || data_len == 0)//长度检查
     return false;
   
-  u32 data=My_Atoi((char *)recv_data);
+  u32 data=My_Atoi((char *)p);
   if(data > 20 || data == 0)
     return false;
+  Volume.pulse_num = data;
   return true;
 }
-*/
+
 
 bool Speed_Check(u8 *recv_data)//脉冲数率有效性检测
 {
@@ -131,11 +132,10 @@ bool Speed_Check(u8 *recv_data)//脉冲数率有效性检测
       return false;
     p++;
   }
-  u32 data=My_Atoi((char *)p);
+  u32 data=My_Atoi((char *)recv_data);
   if(data > 200000 || data == 0)
     return false;
   return true;
-  
 }
 
 bool Number_Check(u8 *recv_data)//脉冲个数有效性检测
@@ -156,7 +156,7 @@ bool Number_Check(u8 *recv_data)//脉冲个数有效性检测
   }
   
   
-  u32 data=My_Atoi((char *)p);
+  u32 data=My_Atoi((char *)recv_data);
   if(data > 2147483647 || data == 0)
     return false;
   return true;
@@ -210,16 +210,18 @@ bool Signal_Register_Check(u8 *recv_data)//信号寄存器有效性检测
 
 bool External_Signal_Check(u8 *recv_data)//外部信号端子有效性检测
 {
-  if(recv_data[0] != 'W')
+  u8 *p=recv_data;
+  if(*p != 'W')
     return false;
   u8 data_len=strlen((char *)recv_data);
-  if(data_len > 2)
+  if(data_len > 2 || data_len == 0)
     return false;
-  recv_data[0]=recv_data[1];
-  recv_data[1]=recv_data[2];
+    p++;
    u32 data=My_Atoi((char *)recv_data);
    if(data > 4)
      return false;
+   if(data == 0 && *p==0)
+      return false;
    return true;
 }
 
@@ -237,7 +239,7 @@ bool Time_Check(u8 *recv_data)//时间有效性检测
       return false;
     p++;
   }
-  u32 data=My_Atoi((char *)p);
+  u32 data=My_Atoi((char *)recv_data);
   if(data > 65535|| data == 0)//数值检查
     return false;
   
@@ -248,7 +250,7 @@ bool Section_Num_Check(u8 *recv_data)//跳转脉冲段序号有效性检测
 {
   u8 * p = recv_data;
   u8 data_len=0;
-  while(*p < '9' && *p > '0')
+  while(*p <= '9' && *p >= '0')
   {
     p++;
     data_len++;
@@ -266,7 +268,7 @@ bool Section_Num_Check(u8 *recv_data)//跳转脉冲段序号有效性检测
     p++;
   }
   
-  u32 data=My_Atoi((char *)p);
+  u32 data=My_Atoi((char *)recv_data);
   if(data > Volume.pulse_num)//数值检查
     return false;
   
@@ -274,13 +276,7 @@ bool Section_Num_Check(u8 *recv_data)//跳转脉冲段序号有效性检测
 }
 
  
-    if(0 == strcmp((char const *)recv_data,"set_end"))
 
-    return true;
-  
-   return false; 
-
-}
 
 void Output_Place(u32 data)//端子指定定时器初始化
 {
@@ -368,7 +364,7 @@ void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,
 
 void Print_Mode_Switch(u8 * send_data)//数据打印
 {
-  
+      memset(SendBuff,0,200);
       strcpy((char *)SendBuff,(const char*)send_data);
       Volume.recv_len = strlen((const char *)SendBuff); 
       MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
@@ -402,10 +398,10 @@ bool Data_Head_Check(u8 *p)//数据头
              p++;
              if(Number_Sum_Check(p))
              {
+              
               p++;
                 if(*p == '\r' && *(p+1) == '\n')
-                {
-                  p+=2;
+                {                
                   return true;
                 }               
                 else 
@@ -427,64 +423,195 @@ bool Data_Head_Check(u8 *p)//数据头
   }          
   else
     return false;
-
 }
 
-u8 Pulse_Data(u8 *p)//数据段错误判断，正确返回0，错误返回非0值
+u8 Pulse_Data(u8 *p)//数据段错误判断，正确返回0，错误返回非0值(1:速率错误 2：个数错误 3：模式错误 4：时间错误 5：信号端子错误 6：跳转数错误 7：其他错误)
 {
-  if(!Speed_Check(p))
+  if(!Speed_Check(p))//速率判断
     return 1;
   
   else
   {
     p=p+strlen((const char *)p)+1;
-    if(!Number_Check(p))
-    return 1;
+    //while(*p)
+    if(!Number_Check(p))//个数判断
+    return 2;
     
     else
     {
       p=p+strlen((const char *)p)+1;
       if(!Mode_Check(p))//模式判断
-        return 1;
+        return 3;
       else
       {
         switch(*p)
         {
           case 'F':{
             p=p+strlen((const char *)p)+1;
-            if(!Section_Num_Check(p))
-              return 1;
+            if(!Section_Num_Check(p))//跳转数
+              return 6;
             else 
             {
-              while(*p < '9' && *p > '0')
+              while(*p <= '9' && *p >= '0')
                 p++;
               if(*p == '\r' && *(p+1) == '\n')
               {
                 p+=2;
                 return Pulse_Data(p);//跑下一段
-              }
+              }else
+              {
+                if(*p == 0)//判断结束
+                  return 0;
+                else
+                  return 7;
+              }               
                
             }
              
           };break;
+          
+          
         case 'T':{
             p=p+strlen((const char *)p)+1;
-            if(!Time_Check(p))
-              return 1;
-            
+            if(!Time_Check(p))//时间判断
+              return 4;
+            else
+            {
+             p=p+strlen((const char *)p)+1 ;
+              if(!Section_Num_Check(p))//跳转数
+                return 6;
+              else 
+              {
+                while(*p <= '9' && *p >= '0')
+                  p++;
+                if(*p == '\r' && *(p+1) == '\n')
+                {
+                  p+=2;
+                  return Pulse_Data(p);//跑下一段
+                }else
+                 {
+                    if(*p == 0)
+                      return 0;
+                    else
+                      return 7;
+                  }     
+                 
+               }
+            }
             
           };break;
+          
           case 'S':{
             p=p+strlen((const char *)p)+1;
+            if(!External_Signal_Check(p))//信号端子判断
+              return 5;
+            else
+            {
+             p=p+strlen((const char *)p)+1 ;
+              if(!Section_Num_Check(p))
+                return 6;
+              else 
+              {
+                while(*p <= '9' && *p >= '0')
+                  p++;
+                if(*p == '\r' && *(p+1) == '\n')
+                {
+                  p+=2;
+                  return Pulse_Data(p);//跑下一段
+                }else
+                 {
+                    if(*p == 0)
+                      return 0;
+                    else
+                      return 7;
+                  }                     
+              }
+            }
           };break;
+          
           case 'A':{
             p=p+strlen((const char *)p)+1;
+            if(!Time_Check(p))
+              return 4;
+            else
+            {
+             p=p+strlen((const char *)p)+1 ;
+              if(!Section_Num_Check(p))
+                return 6;
+              else 
+              {
+                while(*p <= '9' && *p >= '0')
+                  p++;
+                if(*p == '\r' && *(p+1) == '\n')
+                {
+                  p+=2;
+                  return Pulse_Data(p);//跑下一段
+                }else
+                 {
+                    if(*p == 0)
+                      return 0;
+                    else
+                      return 7;
+                  }     
+                 
+               }
+            }
           };break;
+          
           case 'E':{
             p=p+strlen((const char *)p)+1;
+            if(!External_Signal_Check(p))//信号端子判断
+              return 5;
+            else
+            {
+             p=p+strlen((const char *)p)+1 ;
+              if(!Section_Num_Check(p))
+                return 6;
+              else 
+              {
+                while(*p <= '9' && *p >= '0')
+                  p++;
+                if(*p == '\r' && *(p+1) == '\n')
+                {
+                  p+=2;
+                  return Pulse_Data(p);//跑下一段
+                }else
+                 {
+                    if(*p == 0)
+                      return 0;
+                    else
+                      return 7;
+                  }                     
+              }
+            }
           };break;
+          
           case 'X':{
             p=p+strlen((const char *)p)+1;
+            if(!External_Signal_Check(p))//信号端子判断
+              return 5;
+            else
+            {
+             p=p+strlen((const char *)p)+1 ;
+              if(!Section_Num_Check(p))
+                return 6;
+              else 
+              {
+                while(*p <= '9' && *p >= '0')
+                  p++;
+                if(*p == '\r' && *(p+1) == '\n')
+                {
+                  p+=2;
+                  return Pulse_Data(p);//跑下一段
+                }else
+                 {
+                    if(*p == 0)
+                      return 0;
+                    else
+                      return 7;
+                  }                     
+              }
+            }
           };break;
          
         }
@@ -494,16 +621,22 @@ u8 Pulse_Data(u8 *p)//数据段错误判断，正确返回0，错误返回非0值
     }
   
   }
-
   
+  return 0;
 }
 
-bool Data_Format_Check(u8 *p)//数据格式判断
+u8 Data_Format_Check(u8 *p)//数据格式判断
 {
-  if(!Data_Head_Check(p))//数据头判断
-    return false;
-  u16 data_len = strlen((const char *) p);//数据长度
   u16 temp = 0;
+  if(!Data_Head_Check(p))//数据头判断
+    return 8;
+  
+  
+  while(*p != '\n')
+    p++;
+  p++;
+  
+  u16 data_len = strlen((const char *) p);//数据长度
   u8 * str=p;
   for(;temp<data_len;temp++)//数据分隔符替换为0
   {
@@ -511,20 +644,141 @@ bool Data_Format_Check(u8 *p)//数据格式判断
       *str = 0;
     str++;
   }
+  u8 err=Pulse_Data(p);
+  if(err)//脉冲段判断
+  {
+    return err;
+  }
+     
+  return 0;
+}
+
+bool Data_Length_Check(u8 *p)//数据长度判断
+{
+ p+=5;//移动到总段数位置
+ u32 data=My_Atoi((char *)p);
+ u32 temp=0;
+ while(!(*p==0 && *(p+1)==0))
+ {
+    if(*p == '\n')
+      temp++;
+    p++;
+ }
+if(temp != data)
+  return false;
+  return true;
+}
+
+u8 Data_Check(void)//数据帧校验,错误返回错误号，正确返回0
+{
+  u16 len =strlen((char const*)Rx_Buff);//接收数据长度
+  if(len < 15 || len > 607)//长度
+    return 9;
   
+  u8 *p=Rx_Buff; 
+  u8 state=Data_Format_Check(p);
+ if(state)
+ {
+    return state;
+ }
+
+ if(!Data_Length_Check(p))
+ return 9;
+
+  return 0;
+}
+
+void Data_Pulse_Save(u8 *p)//脉冲段数据保存
+{
+  u8 sd=0;
+  Volume.pulse_offset[sd]=1;
+  while(sd < Volume.pulse_num)
+  {
+    Volume.data[Volume.pulse_offset[sd]] = My_Atoi((char*)p);//脉冲速率
+    p=p+strlen((const char *)p)+1;
+    Volume.data[Volume.pulse_offset[sd]+1] = My_Atoi((char*)p);//脉冲个数
+    p=p+strlen((const char *)p)+1;
+    switch(*p)
+    {
+        case 'F':{
+          p+=2;
+           Volume.data[Volume.pulse_offset[sd]+2] = 1<<16;
+           Volume.data[Volume.pulse_offset[sd]+3] = 0;
+           Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);
+        };break;
+        case 'T':{
+        p+=2;
+           Volume.data[Volume.pulse_offset[sd]+2] = 2<<16;
+           Volume.data[Volume.pulse_offset[sd]+3] = My_Atoi((char*)p);//时间
+          while(*p)
+            p++;
+          p++;
+          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);      
+        };break;
+        case 'S':{
+        p+=3;
+           Volume.data[Volume.pulse_offset[sd]+2] = 3<<16+My_Atoi((char*)p);
+           Volume.data[Volume.pulse_offset[sd]+3] = 0;
+          while(*p)
+            p++;
+          p++;
+          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);    
+        };break;
+        case 'A':{
+        p+=2;
+           Volume.data[Volume.pulse_offset[sd]+2] = 4<<16;
+           Volume.data[Volume.pulse_offset[sd]+3] = My_Atoi((char*)p);//时间
+          while(*p)
+            p++;
+          p++;
+          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);      
+        };break;
+        case 'E':{
+        p+=3;
+           Volume.data[Volume.pulse_offset[sd]+2] = 3<<16+My_Atoi((char*)p);
+           Volume.data[Volume.pulse_offset[sd]+3] = 0;
+          while(*p)
+            p++;
+          p++;
+          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);
+        };break;
+        case 'X':{
+         p+=3;
+           Volume.data[Volume.pulse_offset[sd]+2] = 3<<16+My_Atoi((char*)p);
+           Volume.data[Volume.pulse_offset[sd]+3] = 0;
+          while(*p)
+            p++;
+          p++;
+          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);
+        };break;
     
+    }
+    while(*p <= '9' && *p >= '0')
+    p++;
+    if(*p== '\r')
+    {
+      p+=2;
+      sd++;
+      Volume.pulse_offset[sd]=1+5*sd;
+    }else
+   sd++;
+      
+  }
+ 
 }
 
 
-u8 Data_Check(void)//数据帧校验,长度错误返回1，格式错误返回2，数据错误返回3，正确返回0
+void Data_Save(void)//数据保存
 {
-  u8 len =strlen((char const*)Rx_Buff);//接收数据长度
-  if(len < 15 || len > 607)//长度
-    return 1;
-  u8 *p=Rx_Buff;
+  u8 *p = Rx_Buff;
+  p+=3;
+  u32 duanzi = *p-'0';
+  p+=2;
+  u32 pulse_num = My_Atoi((char*)p);
+  Volume.data[0] = (duanzi<<16)+pulse_num;
+  while(*p != '\n')
+    p++;
+  p++;
+  Data_Pulse_Save(p);
   
- if(!Data_Format_Check())
- return 2;
- 
-  return 0;
 }
