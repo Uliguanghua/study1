@@ -22,6 +22,7 @@ int main(void)
         SystemInit();          //时钟初始化
 	delay_init(168);     //延时初始化       
         LED_Init();          //LED初始化
+        EXIT_Init_All();    //初始化所有中断
 	OSInit();          //UCOS初始化        
 	uart_init(9600);	//串口初始化
         data_init();//参数初始化
@@ -50,8 +51,8 @@ void Start_Task(void *pdata)
 	
 	OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
 	//OSTaskCreate(Led_Task_A,(void*)0,(OS_STK*)&LED0_TASK_STK[LED0_STK_SIZE-1],LED0_TASK_PRIO);//创建LEDA任务
-        OSTaskCreate(Led_Task_B,(void*)0,(OS_STK*)&LED1_TASK_STK[LED1_STK_SIZE-1],LED1_TASK_PRIO);//创建LEDB任务
-        OSTaskCreate(Led_Task_C,(void*)0,(OS_STK*)&LED2_TASK_STK[LED2_STK_SIZE-1],LED2_TASK_PRIO);//创建LEDC任务
+        OSTaskCreate(Set_Task,(void*)0,(OS_STK*)&LED1_TASK_STK[LED1_STK_SIZE-1],LED1_TASK_PRIO);//创建LEDB任务
+        OSTaskCreate(Run_Task,(void*)0,(OS_STK*)&LED2_TASK_STK[LED2_STK_SIZE-1],LED2_TASK_PRIO);//创建LEDC任务
         OSTaskCreate(DATA_Task,(void*)0,(OS_STK*)&DATA_TASK_STK[DATA_STK_SIZE-1],DATA_TASK_PRIO);//创建数据处理任务
 	OSTaskSuspend(START_TASK_PRIO);//挂起开始任务
 	OS_EXIT_CRITICAL();  //退出临界区(开中断)
@@ -148,7 +149,7 @@ void Start_Task(void *pdata)
 //}
 
 //LED任务B---设置状态
-void Led_Task_B(void *pdata)
+void Set_Task(void *pdata)
 {
   u8 message[200];//设置模式下的信息打印
   memset(message,0,200);
@@ -183,72 +184,25 @@ void Led_Task_B(void *pdata)
         }else
         {
            memset(Rx_Buff,0,650);//清空接收数据缓冲区
-           switch(err)//根据错误号打印信息
-           {
-           case 1:{ 
-                    strcpy((char *)message,"脉冲速率错误!");
-                    Print_Mode_Switch(message);
-                    memset(message,0,200);
-                   };break;
-           case 2:{ 
-                    strcpy((char *)message,"脉冲个数错误!");
-                    Print_Mode_Switch(message);
-                    memset(message,0,200);
-                   };break; 
-           case 3:{ 
-                    strcpy((char *)message,"脉冲段模式错误!");
-                    Print_Mode_Switch(message);
-                    memset(message,0,200);
-                   };break; 
-           case 4:{ 
-                    strcpy((char *)message,"等待时间错误!");
-                    Print_Mode_Switch(message);
-                    memset(message,0,200);
-                   };break;
-           case 5:{ 
-                    strcpy((char *)message,"信号端子错误!");
-                    Print_Mode_Switch(message);
-                    memset(message,0,200);
-                   };break;
-           case 6:{ 
-                    strcpy((char *)message,"跳转数错误!");
-                    Print_Mode_Switch(message);
-                    memset(message,0,200);
-                   };break;
-           case 7:{ 
-                    strcpy((char *)message,"其他错误错误!");
-                    Print_Mode_Switch(message);
-                    memset(message,0,200);
-                   };break;
-           case 8:{ 
-                    strcpy((char *)message,"数据头错误!");
-                    Print_Mode_Switch(message);
-                    memset(message,0,200);
-                   };break;
-           case 9:{ 
-                    strcpy((char *)message,"数据长度错误!");
-                    Print_Mode_Switch(message);
-                    memset(message,0,200);
-                   };break;
-                  
-           }
+           Err_Print(err,message);//错误打印
+                          
           flag.rx_flag = 0;
         }
       
       }
-      }
-   
-   
-   // OSTaskSuspend(OS_PRIO_SELF);//挂起自身任务
+     }
+
     
-    delay_ms(20);
+    delay_ms(25);
   }
 
  }
 
-//LED任务C---运行状态
-void Led_Task_C(void *pdata)
+//运行状态
+void Run_Task(void *pdata)
 {
+  u8 sd = 0;//当前脉冲段
+  //OS_CPU_SR cpu_sr=0;
     while(1)
   {
     if(flag.current_state==2 && flag.task_flag==2)
@@ -256,87 +210,102 @@ void Led_Task_C(void *pdata)
       Led_Status(flag.current_state);//运行模式灯亮
       Output_Place(Volume.data[0]>>16);//端子指定
       Volume.pulse_num=Volume.data[0]&0x0000FFFF;//总段数
-   
-      while(Volume.sd+1 <= Volume.pulse_num)
+      sd = 0;
+      while(sd+1 <= Volume.pulse_num)
       {
         
-        switch(Volume.data[Volume.pulse_offset[Volume.sd]+2]>>16)//判断模式
+        switch(Volume.data[Volume.pulse_offset[sd]+2]>>16)//判断模式
         {
         case 1:{
-                  if(Volume.data[Volume.pulse_offset[Volume.sd]+1] > 65535)//判断脉冲个数
-                  {
-                    Volume.interruput_times = Volume.data[Volume.pulse_offset[Volume.sd]+1] / 65535;
-                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1] % 65535;
-                  }else
-                  {
-                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1];
-                  }
-                
-                
-                  if(Volume.interruput_times > 0)
-                  {
-                    Pulse_Output_Number(65535,Volume.CNT_TIMx);
-                  }     
-                  else
-                  {
-                    Pulse_Output_Number(Volume.pulse_remainder,Volume.CNT_TIMx);
-                  }
-                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[Volume.sd]],Volume.data[0]>>16);//根据频率设定寄存器值
-                    PWM_Output(Volume.data[Volume.pulse_offset[Volume.sd]],Volume.PWM_TIMx);//脉冲输出
+                    Pluse_Number(sd);
+                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
+                    PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
                     while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
                  
         };break;
         case 2:{
-                  if(Volume.data[Volume.pulse_offset[Volume.sd]+1] > 65535)//判断脉冲个数
-                  {
-                    Volume.interruput_times = Volume.data[Volume.pulse_offset[Volume.sd]+1] / 65535;
-                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1] % 65535;
-                  }else
-                  {
-                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[Volume.sd]+1];
-                  }
-                
-                
-                  if(Volume.interruput_times > 0)
-                  {
-                    Pulse_Output_Number(65535,Volume.CNT_TIMx);
-                  }     
-                  else
-                  {
-                    Pulse_Output_Number(Volume.pulse_remainder,Volume.CNT_TIMx);
-                  }
-                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[Volume.sd]],Volume.data[0]>>16);//根据频率设定寄存器值
-                    PWM_Output(Volume.data[Volume.pulse_offset[Volume.sd]],Volume.PWM_TIMx);//脉冲输出
+                    Pluse_Number(sd);
+                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
+                    PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
                     while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
                     
-                    Delay_ms(Volume.data[Volume.pulse_offset[Volume.sd]+3]);
+                    Delay_ms(Volume.data[Volume.pulse_offset[sd]+3]);
         };break;
         case 3:{
-          
+                    Pluse_Number(sd);
+                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
+                    PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
+                    simulation.ext_signal=0;
+                    
+                    while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
+                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2]&& 0x0000FFFF)+1));//等待信号
+                    
+                   // OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
+                    simulation.ext_signal=0;
+                    //OS_EXIT_CRITICAL();  //退出临界区(开中断)
         };break;
-        case 4:{};break;
-        case 5:{};break;
-        case 6:{};break;
+        case 4:{
+                    Pluse_Number(sd);
+                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
+                    PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
+                   // while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
+                    Delay_ms(Volume.data[Volume.pulse_offset[sd]+3]);
+                    TIM_Cmd(Volume.PWM_TIMx, DISABLE);                  
+                    TIM_Cmd(Volume.CNT_TIMx, DISABLE);
+        
+        };break;
+        
+        case 5:{
+          
+                    Pluse_Number(sd);
+                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
+                    PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
+                    simulation.ext_signal=0;                   
+                    //while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
+                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2]&& 0x0000FFFF)+1));//等待信号
+                    
+                   // OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
+                    simulation.ext_signal=0;
+                    TIM_Cmd(Volume.PWM_TIMx, DISABLE);                  
+                    TIM_Cmd(Volume.CNT_TIMx, DISABLE);
+                    //OS_EXIT_CRITICAL();  //退出临界区(开中断)
+          };break;
+          case 6:{
+                    Pluse_Number(sd);
+                    Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
+                    PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
+                    simulation.ext_signal=0;                   
+                    //while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
+                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2]&& 0x0000FFFF)+1))//等待信号
+                    {
+                      if(flag.send_finish_flag == 0)
+                        break;
+                    }                    
+                   // OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
+                    simulation.ext_signal=0;
+                    TIM_Cmd(Volume.PWM_TIMx, DISABLE);                  
+                    TIM_Cmd(Volume.CNT_TIMx, DISABLE);
+                    //OS_EXIT_CRITICAL();  //退出临界区(开中断)
+          };break;
         }
        
           
-        if(Volume.data[Volume.pulse_offset[Volume.sd]+4] == 0)
-          Volume.sd++;
+        if(Volume.data[Volume.pulse_offset[sd]+4] == 0)
+          sd++;
         else
         {
-          Volume.sd = Volume.data[Volume.pulse_offset[Volume.sd]+4]-1;
+          sd = Volume.data[Volume.pulse_offset[sd]+4]-1;
         }
         
         flag.send_finish_flag=0;
       }
       
-      Volume.recv_times=0;
+      //Volume.recv_times=0;
       flag.task_flag=0;
       flag.current_state=0;
+      Led_Status(flag.current_state);
     }
-    //OSTaskSuspend(OS_PRIO_SELF);//挂起自身任务
-    
-    
+ 
     delay_ms(20);
   }
 }
@@ -367,10 +336,10 @@ void DATA_Task(void *pdata)
             //OSMboxPost(DATA_MBOX,&flag.task_flag);//邮箱数据发送
             //OSTaskResume(5);//恢复任务B
           }
-          else if(0 == strcmp((char const *)Rx_Buff,"go_start") && 0==Volume.recv_times)//进入运行模式
+          else if(0 == strcmp((char const *)Rx_Buff,"go_start") /*&& 0==Volume.recv_times*/)//进入运行模式
           {
             memset(Rx_Buff,0,650);//清空接收数据缓冲区
-           Volume.recv_times=1;//第一次接收到有效数据
+           //Volume.recv_times=1;//第一次接收到有效数据
            flag.current_state=2;
            flag.task_flag=2;
           }
@@ -388,13 +357,22 @@ void DATA_Task(void *pdata)
          
           case 2:{//运行
             flag.rx_flag = 2;
+            if(0 == strcmp((char const *)Rx_Buff,"STOP"))//中止输出
+            {
+               TIM_Cmd(Volume.PWM_TIMx, DISABLE);                  
+               TIM_Cmd(Volume.CNT_TIMx, DISABLE);
+               flag.rx_flag = 0;
+               flag.current_state=0;
+               Led_Status(flag.current_state);//模式灯亮 
+            }
+              memset(Rx_Buff,0,650);//清空接收数据缓冲区
          };break;
          
        }
     }
 
     //DMA_Cmd(DMA2_Stream2, ENABLE);     //打开DMA,数据处理完成后接收数据通道开启
-    delay_ms(30);
+    //delay_ms(30);
   }
   
   //OSTaskSuspend(OS_PRIO_SELF);//挂起自身任务
@@ -471,4 +449,38 @@ void TIM1_BRK_TIM9_IRQHandler(void)//计数器9溢出事件
     }
 
   }
+}
+
+//外部中断4服务程序
+void EXTI4_IRQHandler(void)
+{
+       
+        OSIntEnter();
+        
+        simulation.ext_signal=1;
+
+        EXTI->PR=1<<4;  //清除LINE4上的中断标志位
+        OSIntExit();
+}
+
+void EXTI9_5_IRQHandler(void)
+{
+
+        OSIntEnter(); 
+        if(EXTI_GetITStatus(EXTI_Line5) != RESET)
+        {
+          simulation.ext_signal=2;   
+          EXTI->PR=1<<5;  //清除LINE上的中断标志位
+        }else if(EXTI_GetITStatus(EXTI_Line6) != RESET)
+        {
+          simulation.ext_signal=3;   
+          EXTI->PR=1<<6;  //清除LINE上的中断标志位
+        }else if(EXTI_GetITStatus(EXTI_Line7) != RESET)
+        {
+          simulation.ext_signal=4;   
+          EXTI->PR=1<<7;  //清除LINE上的中断标志位
+        }
+        
+        OSIntExit();
+
 }

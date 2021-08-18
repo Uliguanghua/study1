@@ -16,7 +16,7 @@ struct V{
   TIM_TypeDef * PWM_TIMx;//PWM定时器
 
   //参数数据
-  u8 sd;//当前数据段数
+  //u8 sd;//当前数据段数
   u16 pulse_remainder;//脉冲余数
   u8 pulse_offset[20];//每一段的起始位（偏移量）
   u32 pulse_num;//总脉冲段数，默认两段脉冲
@@ -28,6 +28,28 @@ struct V{
 
 extern struct V Volume;
 
+void data_init(void)//数据初始化
+{
+  Volume.pulse_num=2;//两段脉冲
+  
+  Volume.CNT_TIMx=TIM9;
+  Volume.PWM_TIMx=TIM10;//端子定时器指定
+  Volume.pulse_offset[0]=1;
+  Volume.pulse_offset[1]=6;
+  //两段脉冲，Y0输出，速率100和10，个数为1000和100个，等待模式为脉冲发送完成模式和等待时间模式，使用时间寄存器T1，时间为500ms跳转默认下段一
+  Volume.data[0] = 0x00000002;
+  Volume.data[1] = 0x0000000A;
+  Volume.data[2] = 0x00000064;
+  Volume.data[3] = 0x00030001;
+  Volume.data[4] = 0x00000000;
+  Volume.data[5] = 0x00000000;
+  Volume.data[6] = 0x00000002;
+  Volume.data[7] = 0x00000014;
+  Volume.data[8] = 0x00020000;
+  Volume.data[9] = 0x00000BB8;
+  Volume.data[10] = 0x00000001;
+   
+}
 
 u32 My_Atoi(char *source) //字符串转整形,遇到第一个非数字停止
 {
@@ -283,29 +305,46 @@ void Output_Place(u32 data)//端子指定定时器初始化
 
   switch(data)
   {
-  case 0:{//Y0输出
-            PWM_TIM10_Configuration();
-            CNT_TIM9_Configuration(TIM_TS_ITR2); 
-            
-  }break;
-  case 1:{//Y1输出
-            PWM_TIM13_Configuration();
-            CNT_TIM12_Configuration(TIM_TS_ITR2);
-      
-  }break;
-  case 2:{//Y2输出
-            PWM_TIM11_Configuration();
-            CNT_TIM9_Configuration(TIM_TS_ITR3);
-   
-  }break;
-  case 3:{//Y3输出
-           PWM_TIM14_Configuration();
-           CNT_TIM12_Configuration(TIM_TS_ITR3);
+    case 0:{//Y0输出
+              PWM_TIM10_Configuration();
+              CNT_TIM9_Configuration(TIM_TS_ITR2); 
+              
+    }break;
+    case 1:{//Y1输出
+              PWM_TIM13_Configuration();
+              CNT_TIM12_Configuration(TIM_TS_ITR2);
         
-  }break;
-  
+    }break;
+    case 2:{//Y2输出
+              PWM_TIM11_Configuration();
+              CNT_TIM9_Configuration(TIM_TS_ITR3);
+     
+    }break;
+    case 3:{//Y3输出
+             PWM_TIM14_Configuration();
+             CNT_TIM12_Configuration(TIM_TS_ITR3);
+          
+    }break;   
   
   }
+  
+          switch(data)//根据端子配置定时器
+           {
+             case 0:{Volume.CNT_TIMx = TIM9;
+                     Volume.PWM_TIMx = TIM10;
+             };break;
+             case 1:{Volume.CNT_TIMx = TIM12;
+                    Volume.PWM_TIMx = TIM13;
+             };break;
+             case 2:{Volume.CNT_TIMx = TIM9;
+                    Volume.PWM_TIMx = TIM11;
+             };break;
+             case 3:{Volume.CNT_TIMx = TIM12;
+                    Volume.PWM_TIMx = TIM14;
+             };break;  
+           }
+  
+  
 }
 
 void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,u32 frequency,u32 port)//根据脉冲频率设置寄存器值
@@ -390,7 +429,7 @@ bool Data_Head_Check(u8 *p)//数据头
       if(Rx_Buff[2] == 'Y')
       {
         p++;
-        if(Rx_Buff[3] > '0' && Rx_Buff[3] < '4')
+        if(Rx_Buff[3] >= '0' && Rx_Buff[3] < '4')
         {
           p++;
           if(Rx_Buff[1] == '-')
@@ -717,7 +756,7 @@ void Data_Pulse_Save(u8 *p)//脉冲段数据保存
         };break;
         case 'S':{
         p+=3;
-           Volume.data[Volume.pulse_offset[sd]+2] = 3<<16+My_Atoi((char*)p);
+           Volume.data[Volume.pulse_offset[sd]+2] = (3<<16)+My_Atoi((char*)p);
            Volume.data[Volume.pulse_offset[sd]+3] = 0;
           while(*p)
             p++;
@@ -735,7 +774,7 @@ void Data_Pulse_Save(u8 *p)//脉冲段数据保存
         };break;
         case 'E':{
         p+=3;
-           Volume.data[Volume.pulse_offset[sd]+2] = 3<<16+My_Atoi((char*)p);
+           Volume.data[Volume.pulse_offset[sd]+2] = (3<<16)+My_Atoi((char*)p);
            Volume.data[Volume.pulse_offset[sd]+3] = 0;
           while(*p)
             p++;
@@ -744,7 +783,7 @@ void Data_Pulse_Save(u8 *p)//脉冲段数据保存
         };break;
         case 'X':{
          p+=3;
-           Volume.data[Volume.pulse_offset[sd]+2] = 3<<16+My_Atoi((char*)p);
+           Volume.data[Volume.pulse_offset[sd]+2] = (3<<16)+My_Atoi((char*)p);
            Volume.data[Volume.pulse_offset[sd]+3] = 0;
           while(*p)
             p++;
@@ -781,4 +820,78 @@ void Data_Save(void)//数据保存
   p++;
   Data_Pulse_Save(p);
   
+}
+
+void Err_Print(u8 err ,u8 *message)//错误打印
+{
+  
+        switch(err)//根据错误号打印信息
+         {
+           case 1:{ 
+                    strcpy((char *)message,"脉冲速率错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break;
+           case 2:{ 
+                    strcpy((char *)message,"脉冲个数错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break; 
+           case 3:{ 
+                    strcpy((char *)message,"脉冲段模式错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break; 
+           case 4:{ 
+                    strcpy((char *)message,"等待时间错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break;
+           case 5:{ 
+                    strcpy((char *)message,"信号端子错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break;
+           case 6:{ 
+                    strcpy((char *)message,"跳转数错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break;
+           case 7:{ 
+                    strcpy((char *)message,"其他错误错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break;
+           case 8:{ 
+                    strcpy((char *)message,"数据头错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break;
+           case 9:{ 
+                    strcpy((char *)message,"数据长度错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break;
+      }
+}
+
+void Pluse_Number(u8 sd)//根据个数设置中断次数
+{
+                  if(Volume.data[Volume.pulse_offset[sd]+1] > 65535)//判断脉冲个数
+                  {
+                    Volume.interruput_times = Volume.data[Volume.pulse_offset[sd]+1] / 65535;
+                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[sd]+1] % 65535;
+                  }else
+                  {
+                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[sd]+1];
+                  }
+                               
+                  if(Volume.interruput_times > 0)
+                  {
+                    Pulse_Output_Number(65535,Volume.CNT_TIMx);
+                  }     
+                  else
+                  {
+                    Pulse_Output_Number(Volume.pulse_remainder,Volume.CNT_TIMx);
+                  }
 }

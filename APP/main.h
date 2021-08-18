@@ -10,7 +10,7 @@
 #include "sys.h"
 #include "includes.h"
 #include "usart.h"
-//#include "exti.h"
+#include "exti.h"
 #include "pwm.h"
 #include "dma.h"
 
@@ -54,14 +54,14 @@ struct V{
   TIM_TypeDef * PWM_TIMx;//PWM定时器
 
   //参数数据
-  u8 sd;//当前数据段数
+  //u8 sd;//当前数据段数
   u16 pulse_remainder;//脉冲余数
   u8 pulse_offset[20];//每一段的起始位（偏移量）
   u32 pulse_num;//总脉冲段数，默认两段脉冲
   u32 output_port;//输出端子，默认为0
   u16 mode;//脉冲段模式
   u32 data[101];//脉冲段数据
-  u8 pulse_data[21][31];//脉冲数据指令
+  
   
   
 }Volume;
@@ -96,7 +96,7 @@ void Start_Task(void *pdata);
 //任务堆栈
 OS_STK LED0_TASK_STK[LED0_STK_SIZE];
 //任务函数
-void Led_Task_A(void *pdata);
+void Set_Task(void *pdata);
 
 //设置任务
 //设置任务优先级
@@ -106,7 +106,7 @@ void Led_Task_A(void *pdata);
 //任务堆栈
 OS_STK LED1_TASK_STK[LED1_STK_SIZE];
 //任务函数
-void Led_Task_B(void *pdata);
+void Run_Task(void *pdata);
 
 
 //运行任务
@@ -130,35 +130,14 @@ OS_STK DATA_TASK_STK[DATA_STK_SIZE];
 void DATA_Task(void *pdata);
 
 
-void data_init()//数据初始化
-{
-  Volume.pulse_num=2;//两段脉冲
-  
-  Volume.CNT_TIMx=TIM9;
-  Volume.PWM_TIMx=TIM10;//端子定时器指定
-  Volume.pulse_offset[0]=1;
-  Volume.pulse_offset[1]=6;
-  //两段脉冲，Y0输出，速率100和10，个数为1000和100个，等待模式为脉冲发送完成模式和等待时间模式，使用时间寄存器T1，时间为500ms跳转默认下段一
-  Volume.data[0] = 0x00000002;
-  Volume.data[1] = 0x0000000A;
-  Volume.data[2] = 0x00000064;
-  Volume.data[3] = 0x00010000;
-  Volume.data[4] = 0x00000000;
-  Volume.data[5] = 0x00000000;
-  Volume.data[6] = 0x00000002;
-  Volume.data[7] = 0x00000014;
-  Volume.data[8] = 0x00020001;
-  Volume.data[9] = 0x000001F4;
-  Volume.data[10] = 0x00000001;
-   
-}
+
 
 /**************函数声明*******************/
 
 u32 My_Atoi(char *source); //字符串转整形
 void My_Itoa (u16 num,char str[]);//整型转字符串
 void Led_Status(u8 state);//LED状态
-
+void data_init(void);//数据初始化
 bool Output_Check(u8 *recv_data);//输出端子有效性检测
 bool Number_Sum_Check(u8 *recv_data);//总脉冲段数有效性检测
 bool Speed_Check(u8 *recv_data);//脉冲数率有效性检测
@@ -175,4 +154,6 @@ void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,
 void Print_Mode_Switch(u8 * send_data);//数据打印
 u8 Data_Check(void);//数据帧校验,错误返回错误号，正确返回0
 void Data_Save(void);//数据保存
+void Pluse_Number(u8 sd);//脉冲个数判断
+void Err_Print(u8 err ,u8 *message);//错误打印
 #endif 
