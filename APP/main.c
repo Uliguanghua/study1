@@ -161,14 +161,14 @@ void Set_Task(void *pdata)
       {
         memset(Rx_Buff,0,650);//清空接收数据缓冲区
         flag.current_state=0;//回到空闲
-        Led_Status(flag.current_state);//模式灯亮 
         flag.rx_flag = 0;
+        Led_Status(flag.current_state);//模式灯亮 
+        
       }else
       {
-        u8 err= Data_Check();
+        u8 err= Data_Check();//数据检查
         if(0 == err )
-        {
-          
+        {          
           strcpy((char *)message,"数据设置成功!");
           Print_Mode_Switch(message);
           memset(message,0,200);
@@ -178,7 +178,7 @@ void Set_Task(void *pdata)
           
           //数据保存
           memset(Volume.data,0,101);//数据清空
-          Data_Save();
+          Data_Save();//数据保存
           
           memset(Rx_Buff,0,650);//清空接收数据缓冲区
         }else
@@ -186,7 +186,7 @@ void Set_Task(void *pdata)
            memset(Rx_Buff,0,650);//清空接收数据缓冲区
            Err_Print(err,message);//错误打印
                           
-          flag.rx_flag = 0;
+           flag.rx_flag = 0;
         }
       
       }
@@ -202,32 +202,33 @@ void Set_Task(void *pdata)
 void Run_Task(void *pdata)
 {
   u8 sd = 0;//当前脉冲段
+  //u8 w=0;
   //OS_CPU_SR cpu_sr=0;
     while(1)
   {
     if(flag.current_state==2 && flag.task_flag==2)
     {
       Led_Status(flag.current_state);//运行模式灯亮
-      Output_Place(Volume.data[0]>>16);//端子指定
+      Output_Place(Volume.data[0]>>16);//端子指定，定时器选择
       Volume.pulse_num=Volume.data[0]&0x0000FFFF;//总段数
       sd = 0;
       while(sd+1 <= Volume.pulse_num)
       {
-        
+        flag.send_finish_flag=0;
         switch(Volume.data[Volume.pulse_offset[sd]+2]>>16)//判断模式
         {
         case 1:{
                     Pluse_Number(sd);
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
-                    while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
+                    while(flag.send_finish_flag == 0 && flag.current_state==2);//循环等待到一段脉冲发送完成
                  
         };break;
         case 2:{
                     Pluse_Number(sd);
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
-                    while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
+                    while(flag.send_finish_flag == 0 && flag.current_state==2);//循环等待到一段脉冲发送完成
                     
                     Delay_ms(Volume.data[Volume.pulse_offset[sd]+3]);
         };break;
@@ -237,8 +238,10 @@ void Run_Task(void *pdata)
                     PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
                     simulation.ext_signal=0;
                     
-                    while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
-                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2]&& 0x0000FFFF)+1));//等待信号
+                    while(flag.send_finish_flag == 0 && flag.current_state==2);//循环等待到一段脉冲发送完成
+                    
+                   
+                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2]  &  0x0000FFFF)+1));//等待信号
                     
                    // OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
                     simulation.ext_signal=0;
@@ -262,7 +265,7 @@ void Run_Task(void *pdata)
                     PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
                     simulation.ext_signal=0;                   
                     //while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
-                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2]&& 0x0000FFFF)+1));//等待信号
+                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2] & 0x0000FFFF)+1));//等待信号
                     
                    // OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
                     simulation.ext_signal=0;
@@ -276,9 +279,9 @@ void Run_Task(void *pdata)
                     PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
                     simulation.ext_signal=0;                   
                     //while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
-                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2]&& 0x0000FFFF)+1))//等待信号
+                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2] & 0x0000FFFF)+1))//等待信号
                     {
-                      if(flag.send_finish_flag == 0)
+                      if(flag.send_finish_flag != 0)
                         break;
                     }                    
                    // OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
@@ -301,11 +304,12 @@ void Run_Task(void *pdata)
       }
       
       //Volume.recv_times=0;
+      sd = 0;
       flag.task_flag=0;
       flag.current_state=0;
       Led_Status(flag.current_state);
     }
- 
+    
     delay_ms(20);
   }
 }
@@ -359,10 +363,14 @@ void DATA_Task(void *pdata)
             flag.rx_flag = 2;
             if(0 == strcmp((char const *)Rx_Buff,"STOP"))//中止输出
             {
+               
                TIM_Cmd(Volume.PWM_TIMx, DISABLE);                  
                TIM_Cmd(Volume.CNT_TIMx, DISABLE);
                flag.rx_flag = 0;
+               flag.task_flag=0;
                flag.current_state=0;
+               Volume.pulse_num=0;
+               
                Led_Status(flag.current_state);//模式灯亮 
             }
               memset(Rx_Buff,0,650);//清空接收数据缓冲区
@@ -391,9 +399,9 @@ void USART1_IRQHandler(void)//串口空闲中断
                
                 //USART_ClearFlag(USART1,USART_IT_IDLE);
                 
-                Volume.UART1_ReceiveSize =RECEIVE_BUF_SIZE - DMA_GetCurrDataCounter(DMA2_Stream2);
+                u8 UART1_ReceiveSize =RECEIVE_BUF_SIZE - DMA_GetCurrDataCounter(DMA2_Stream2);
                 
-                if(Volume.UART1_ReceiveSize !=0)//接收数据长度不为0
+                if(UART1_ReceiveSize !=0)//接收数据长度不为0
                 {
                       flag.rx_flag=0;  //数据帧接收标志位置为1
                       OSMboxPost(DATA_MBOX,&flag.rx_flag);

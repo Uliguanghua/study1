@@ -8,9 +8,9 @@ extern u8 Rx_Buff[650];//接收缓冲区
 
 struct V{
   //计量数据
-  u16 UART1_ReceiveSize; //DMA接收数据的长度
+  //u16 UART1_ReceiveSize; //DMA接收数据的长度
   u16 recv_len; //发送数据实际长度
-  u8  recv_times;//接收数据次数
+  //u8  recv_times;//接收数据次数
   u8  interruput_times;//计数器中断次数 
   TIM_TypeDef * CNT_TIMx;//计数定时器
   TIM_TypeDef * PWM_TIMx;//PWM定时器
@@ -20,9 +20,11 @@ struct V{
   u16 pulse_remainder;//脉冲余数
   u8 pulse_offset[20];//每一段的起始位（偏移量）
   u32 pulse_num;//总脉冲段数，默认两段脉冲
-  u32 output_port;//输出端子，默认为0
-  u16 mode;//脉冲段模式
-  u32 data[600];//脉冲段数据
+ // u32 output_port;//输出端子，默认为0
+  //u16 mode;//脉冲段模式
+  u32 data[101];//脉冲段数据
+  
+  
   
 };
 
@@ -31,7 +33,6 @@ extern struct V Volume;
 void data_init(void)//数据初始化
 {
   Volume.pulse_num=2;//两段脉冲
-  
   Volume.CNT_TIMx=TIM9;
   Volume.PWM_TIMx=TIM10;//端子定时器指定
   Volume.pulse_offset[0]=1;
@@ -437,8 +438,11 @@ bool Data_Head_Check(u8 *p)//数据头
              p++;
              if(Number_Sum_Check(p))
              {
-              
-              p++;
+              u32 temp = My_Atoi((char *)p);
+              if(temp > 9)
+                p+=2;
+              else
+                p++;
                 if(*p == '\r' && *(p+1) == '\n')
                 {                
                   return true;
@@ -774,7 +778,7 @@ void Data_Pulse_Save(u8 *p)//脉冲段数据保存
         };break;
         case 'E':{
         p+=3;
-           Volume.data[Volume.pulse_offset[sd]+2] = (3<<16)+My_Atoi((char*)p);
+           Volume.data[Volume.pulse_offset[sd]+2] = (5<<16)+My_Atoi((char*)p);
            Volume.data[Volume.pulse_offset[sd]+3] = 0;
           while(*p)
             p++;
@@ -783,7 +787,7 @@ void Data_Pulse_Save(u8 *p)//脉冲段数据保存
         };break;
         case 'X':{
          p+=3;
-           Volume.data[Volume.pulse_offset[sd]+2] = (3<<16)+My_Atoi((char*)p);
+           Volume.data[Volume.pulse_offset[sd]+2] = (6<<16)+My_Atoi((char*)p);
            Volume.data[Volume.pulse_offset[sd]+3] = 0;
           while(*p)
             p++;
@@ -895,3 +899,6 @@ void Pluse_Number(u8 sd)//根据个数设置中断次数
                     Pulse_Output_Number(Volume.pulse_remainder,Volume.CNT_TIMx);
                   }
 }
+
+
+//void  

@@ -46,9 +46,9 @@ struct F{
 
 struct V{
   //计量数据
-  u16 UART1_ReceiveSize; //DMA接收数据的长度
+  //u16 UART1_ReceiveSize; //DMA接收数据的长度
   u16 recv_len; //发送数据实际长度
-  u8  recv_times;//接收数据次数
+  //u8  recv_times;//接收数据次数
   u8  interruput_times;//计数器中断次数 
   TIM_TypeDef * CNT_TIMx;//计数定时器
   TIM_TypeDef * PWM_TIMx;//PWM定时器
@@ -58,8 +58,8 @@ struct V{
   u16 pulse_remainder;//脉冲余数
   u8 pulse_offset[20];//每一段的起始位（偏移量）
   u32 pulse_num;//总脉冲段数，默认两段脉冲
-  u32 output_port;//输出端子，默认为0
-  u16 mode;//脉冲段模式
+  //u32 output_port;//输出端子，默认为0
+  //u16 mode;//脉冲段模式
   u32 data[101];//脉冲段数据
   
   
