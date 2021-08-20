@@ -19,5 +19,7 @@ void CNT_TIM12_Configuration(uint16_t TIM_TS_ITRx);
 void PWM_Output(uint32_t Frequency, TIM_TypeDef * PWM_TIMx);
 void Pulse_Output_Number(u16 NumPulse,TIM_TypeDef * CNT_TIMx);
 
+
+void Tim_Init(void);
 //void TIM14_PWM_Init(u32 arr,u32 psc);
 #endif

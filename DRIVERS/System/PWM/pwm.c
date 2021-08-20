@@ -296,6 +296,13 @@ void Pulse_Output_Number(u16 NumPulse, TIM_TypeDef * CNT_TIMx)//Âö³å¸öÊıÉèÖÃ
 }
 
 
+void Tim_Init()
+{
+  PWM_TIM10_Configuration();
+  PWM_TIM11_Configuration();
+  PWM_TIM13_Configuration();
+  PWM_TIM14_Configuration();
+}
 
 
 

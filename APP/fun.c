@@ -679,6 +679,14 @@ if(temp != data)
   return true;
 }
 
+
+//bool Output_Check(u8 *p)//输出端子检测（不能有相邻的两个相同触发端子）
+//{
+//  u8 sd=0;
+//  while(*p)
+//
+//}
+
 u8 Data_Check(void)//数据帧校验,错误返回错误号，正确返回0
 {
   u16 len =strlen((char const*)Rx_Buff);//接收数据长度
@@ -688,12 +696,12 @@ u8 Data_Check(void)//数据帧校验,错误返回错误号，正确返回0
   u8 *p=Rx_Buff; 
   u8 state=Data_Format_Check(p);
  if(state)
- {
-    return state;
- }
+   return state;
+ 
 
  if(!Data_Length_Check(p))
  return 9;
+ 
 
   return 0;
 }
@@ -847,7 +855,10 @@ void Err_Print(u8 err ,u8 *message)//错误打印
 
 void Pluse_Number(u8 sd)//根据个数设置中断次数
 {
-
+                  
+                  Volume.interruput_times=0;
+                  Volume.pulse_remainder =0;
+                  
                   if(Volume.data[1+sd*5+1] > 65535)//判断脉冲个数
                   {
                     Volume.interruput_times = Volume.data[1+sd*5+1] / 65535;
@@ -947,10 +958,10 @@ void Print_Data(void)//掉电保持数据打印
 }  
 
 
-void Pulse_Num_Print(u8 sd)//脉冲输出个数打印
+void Pulse_Num_Print()//脉冲输出个数打印
 {
   u8 offset=1;
-  for(;offset<=sd;offset++)
+  for(;offset<=Volume.pulse_num;offset++)
   {
     printf("\r\n段号:%d ",offset);
     printf("发送个数:%d",Volume.send_pulse_num[offset-1]);

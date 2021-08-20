@@ -30,7 +30,8 @@ struct F{
   u8  current_state;//0:空闲状态    1：设置脉冲数状态    2：运行状态
   u8  rx_flag; //数据帧接收标志,表示接收到数据
   u8  send_finish_flag;//发送一段脉冲完成标志位*
-  u8  ext_signal;//外部信号*
+  u8  ext_signal;//外部信号*0表示没信号，10、11、12、13表示W0   
+  //u8  signal_mode;//中断信号模式->3、5、6
   
 }flag;
 
@@ -145,7 +146,7 @@ void Output_Place(u32 data);//端子指定定时器初始化
 void Print_Mode_Switch(u8 * send_data);//数据打印
 void Err_Print(u8 err ,u8 *message);//错误打印
 void Print_Data(void);//掉电数据打印
-void Pulse_Num_Print(u8 sd);//脉冲输出个数打印
+void Pulse_Num_Print();//脉冲输出个数打印
 
 //数据保存与设置
 void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,u32 frequency,u32 port);//频率选择
