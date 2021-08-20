@@ -13,9 +13,9 @@
 #include "exti.h"
 #include "pwm.h"
 #include "dma.h"
+#include "stmflash.h"
 
-
-
+#define FLASH_SAVE_ADDR  0X08040000	//FLASH保存地址
 #define SEND_BUF_SIZE 200  //发送缓冲区长度
 #define RECEIVE_BUF_SIZE 650 // 接收缓冲区长度
 
@@ -24,13 +24,6 @@ u8 Rx_Buff[RECEIVE_BUF_SIZE];//接收缓冲区
 
 OS_EVENT* DATA_MBOX;//邮箱
 
-/*********************模拟值***************/
-struct S{
-  
-  u8 time;//时间
-  u8 ext_signal;//外部信号
-
-}simulation;
 
 /*********************标志***************/
 struct F{
@@ -46,28 +39,17 @@ struct F{
 
 struct V{
   //计量数据
-  //u16 UART1_ReceiveSize; //DMA接收数据的长度
-  u16 recv_len; //发送数据实际长度
-  //u8  recv_times;//接收数据次数
   u8  interruput_times;//计数器中断次数 
   TIM_TypeDef * CNT_TIMx;//计数定时器
   TIM_TypeDef * PWM_TIMx;//PWM定时器
-
+  u8 ext_signal;//外部信号
   //参数数据
-  //u8 sd;//当前数据段数
+
   u16 pulse_remainder;//脉冲余数
   u8 pulse_offset[20];//每一段的起始位（偏移量）
   u32 pulse_num;//总脉冲段数，默认两段脉冲
-  //u32 output_port;//输出端子，默认为0
-  //u16 mode;//脉冲段模式
-  u32 data[101];//脉冲段数据
-  
-  
-  
+  u32 data[101];//脉冲段数据 
 }Volume;
-
-
-
 
 
 
@@ -136,24 +118,32 @@ void DATA_Task(void *pdata);
 
 u32 My_Atoi(char *source); //字符串转整形
 void My_Itoa (u16 num,char str[]);//整型转字符串
+
+
 void Led_Status(u8 state);//LED状态
-void data_init(void);//数据初始化
+
+
+//数据有效性检测
 bool Output_Check(u8 *recv_data);//输出端子有效性检测
 bool Number_Sum_Check(u8 *recv_data);//总脉冲段数有效性检测
 bool Speed_Check(u8 *recv_data);//脉冲数率有效性检测
 bool Number_Check(u8 *recv_data);//脉冲个数有效性检测
 bool Mode_Check(u8 *recv_data);//脉冲模式有效性检测
-bool Time_Register_Check(u8 *recv_data);//时间寄存器有效性检测
-bool Signal_Register_Check(u8 *recv_data);//信号寄存器有效性检测
 bool External_Signal_Check(u8 *recv_data);//外部信号端子有效性检测
 bool Time_Check(u8 *recv_data);//时间有效性检测
 bool Section_Num_Check(u8 *recv_data,u16 sum);//跳转脉冲段序号有效性检测
 bool End_Check(u8 *recv_data);//结束指令有效性检测
+u8 Data_Check(void);//数据帧校验,错误返回错误号，正确返回0
+
+//初始化
+void data_init(void);//数据初始化
 void Output_Place(u32 data);//端子指定定时器初始化
+
+//数据保存与设置
 void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,u32 frequency,u32 port);//频率选择
 void Print_Mode_Switch(u8 * send_data);//数据打印
-u8 Data_Check(void);//数据帧校验,错误返回错误号，正确返回0
 void Data_Save(void);//数据保存
-void Pluse_Number(u8 sd);//脉冲个数判断
+void Pluse_Number(u8 sd);////根据个数设置中断次数
 void Err_Print(u8 err ,u8 *message);//错误打印
+void Print_Data(void);//上次数据打印
 #endif 

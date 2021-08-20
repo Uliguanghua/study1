@@ -8,25 +8,18 @@ extern u8 Rx_Buff[650];//接收缓冲区
 
 struct V{
   //计量数据
-  //u16 UART1_ReceiveSize; //DMA接收数据的长度
-  u16 recv_len; //发送数据实际长度
-  //u8  recv_times;//接收数据次数
   u8  interruput_times;//计数器中断次数 
   TIM_TypeDef * CNT_TIMx;//计数定时器
   TIM_TypeDef * PWM_TIMx;//PWM定时器
-
+  u8 ext_signal;//外部信号
   //参数数据
-  //u8 sd;//当前数据段数
+
   u16 pulse_remainder;//脉冲余数
   u8 pulse_offset[20];//每一段的起始位（偏移量）
   u32 pulse_num;//总脉冲段数，默认两段脉冲
- // u32 output_port;//输出端子，默认为0
-  //u16 mode;//脉冲段模式
-  u32 data[101];//脉冲段数据
-  
-  
-  
+  u32 data[101];//脉冲段数据 
 };
+
 
 extern struct V Volume;
 
@@ -64,7 +57,7 @@ u32 My_Atoi(char *source) //字符串转整形,遇到第一个非数字停止
 	return temp_sum;
 }
 
-void My_Itoa (u16 num,char str[])//整型转字符串
+void My_Itoa (u32 num,char str[])//整型转字符串
 {
         u8 offset=0;
 
@@ -300,7 +293,6 @@ bool Section_Num_Check(u8 *recv_data)//跳转脉冲段序号有效性检测
 
  
 
-
 void Output_Place(u32 data)//端子指定定时器初始化
 {
 
@@ -406,8 +398,8 @@ void Print_Mode_Switch(u8 * send_data)//数据打印
 {
       memset(SendBuff,0,200);
       strcpy((char *)SendBuff,(const char*)send_data);
-      Volume.recv_len = strlen((const char *)SendBuff); 
-      MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
+      u8 recv_len = strlen((const char *)SendBuff); 
+      MYDMA_Enable(DMA2_Stream7,recv_len); 
        while(1)
 	 {
             if(DMA_GetFlagStatus(DMA2_Stream7,DMA_FLAG_TCIF7)!=RESET)
@@ -810,7 +802,6 @@ void Data_Pulse_Save(u8 *p)//脉冲段数据保存
  
 }
 
-
 void Data_Save(void)//数据保存
 {
   u8 *p = Rx_Buff;
@@ -881,6 +872,7 @@ void Err_Print(u8 err ,u8 *message)//错误打印
 
 void Pluse_Number(u8 sd)//根据个数设置中断次数
 {
+
                   if(Volume.data[Volume.pulse_offset[sd]+1] > 65535)//判断脉冲个数
                   {
                     Volume.interruput_times = Volume.data[Volume.pulse_offset[sd]+1] / 65535;
@@ -898,7 +890,83 @@ void Pluse_Number(u8 sd)//根据个数设置中断次数
                   {
                     Pulse_Output_Number(Volume.pulse_remainder,Volume.CNT_TIMx);
                   }
-}
+}  
 
 
-//void  
+void Print_Data(void)
+{
+  
+  
+    u32 *p = Volume.data;
+    u32 Times=1;
+    u32 temp=0;
+    //打印输出端子
+    
+    temp = (*p)>>16;
+    printf("\r\n输出端子:Y%d",temp);
+    
+    u32 pulse_num = (*p) & 0x0000FFFF;
+    printf("\r\n总脉冲个数:%d",pulse_num);
+    
+    while(Times <= pulse_num)
+    {
+      printf("\r\n段号:%d ",Times);
+      temp = Volume.data[1+5*(Times-1)];//速率
+      printf("速率:%d ",temp);
+      
+      temp = Volume.data[2+5*(Times-1)];//个数
+      printf("个数:%d ",temp);
+      
+      temp = Volume.data[3+5*(Times-1)]>>16;//模式
+      
+      switch(temp)
+      {
+      case 1:{
+            printf("模式:发送完成模式 "); 
+            
+            temp = Volume.data[4+5*(Times-1)];//跳转
+            printf("跳转段:%d段 ",temp);  
+      };break;
+      case 2:{
+            printf("模式:wait时间模式 ");
+            temp = Volume.data[4+5*(Times-1)];//时间
+            printf("时间:%dms ",temp); 
+            temp = Volume.data[5+5*(Times-1)];//跳转
+            printf("跳转段:%d段 ",temp);  
+        
+      };break;
+      case 3:{
+            printf("模式:wait信号模式 ");
+            temp = Volume.data[3+5*(Times-1)] & 0x0000FFFF;//信号端子
+            printf("触发端子:W%d ",temp);
+            temp = Volume.data[5+5*(Times-1)];//跳转
+            printf("跳转段:%d段 ",temp);
+      };break;
+      case 4:{
+            printf("模式:ACT时间模式 ");
+            temp = Volume.data[4+5*(Times-1)];//时间
+            printf("时间:%dms ",temp); 
+            temp = Volume.data[5+5*(Times-1)];//跳转
+            printf("跳转段:%d段 ",temp);  
+      };break;
+      case 5:{
+            printf("模式:EXIT信号模式 ");
+            temp = Volume.data[3+5*(Times-1)] & 0x0000FFFF;//信号端子
+            printf("触发端子:W%d ",temp);
+            temp = Volume.data[5+5*(Times-1)];//跳转
+            printf("跳转段:%d段 ",temp);
+      };break;
+      case 6:{
+            printf("模式:EXIT信号/发送完成模式 ");
+            temp = Volume.data[3+5*(Times-1)] & 0x0000FFFF;//信号端子
+            printf("触发端子:W%d ",temp);
+            temp = Volume.data[5+5*(Times-1)];//跳转
+            printf("跳转段:%d段 ",temp);
+      };break;
+               
+    }
+           
+      Times++;  
+   }
+    
+}  

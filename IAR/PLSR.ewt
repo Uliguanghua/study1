@@ -2683,6 +2683,15 @@
                 </file>
             </group>
             <group>
+                <name>FLASH</name>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\FLASH\stmflash.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\DRIVERS\System\FLASH\stmflash.h</name>
+                </file>
+            </group>
+            <group>
                 <name>LED</name>
                 <file>
                     <name>$PROJ_DIR$\..\DRIVERS\System\LED\led.c</name>

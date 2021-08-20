@@ -4,6 +4,7 @@
 #include "sys.h" 
 
 
+
 #define USART_REC_LEN  			200  
 #define EN_USART1_RX 			1		//使能（1）/禁止（0）串口1接收
 extern char  USART_RX_BUF[USART_REC_LEN]; 

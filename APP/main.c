@@ -25,7 +25,8 @@ int main(void)
         EXIT_Init_All();    //初始化所有中断
 	OSInit();          //UCOS初始化        
 	uart_init(9600);	//串口初始化
-        data_init();//参数初始化
+        //data_init();//参数初始化
+        STMFLASH_Read(FLASH_SAVE_ADDR,Volume.data,101);
         Delay_TIM2_Configuration();//计数定时器初始化
         MYDMASEND_Config((u32)&(USART1->DR),(u32)SendBuff,SEND_BUF_SIZE);//DMA发送初始化
         MYDMAREC_Config((u32)&(USART1->DR),(u32)Rx_Buff,RECEIVE_BUF_SIZE);//DMA接收初始化
@@ -58,97 +59,9 @@ void Start_Task(void *pdata)
 	OS_EXIT_CRITICAL();  //退出临界区(开中断)
 }
 
-//任务A---空闲状态
-//void Led_Task_A(void *pdata)
-//{       
-//     
-//     
-//      
-//          
-//     while(1)
-//     {      
-//          
-//          if(flag.current_state == 0)                                 															//?óê?μ?ò???êy?Y
-//          {
-//            Led_Status(flag.current_state);//空闲模式灯亮
-//        /*  Volume.recv_len = strlen((const char *)SendBuff); //回显
-//            MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
-//            while(1)
-//             {
-//                if(DMA_GetFlagStatus(DMA2_Stream7,DMA_FLAG_TCIF7)!=RESET)
-//                { 
-//                  DMA_ClearFlag(DMA2_Stream7,DMA_FLAG_TCIF7);
-//                  break; 
-//                 }
-//             }
-//         if(0 == strcmp((char const *)SendBuff,"exit"))//退出设置模式   
-//         {
-//            Volume.recv_times=0;
-//            flag.current_state=0;
-//            flag.task_flag=0;
-//
-//            Led_Status(flag.current_state);//空闲模式灯亮	
-//            u8 mode[]={"\r\n请输入指令切换状态：go_set切换到设置状态，go_start切换到运行状态\r\n"};
-//            Print_Mode_Switch(mode);//打印信息
-//            
-//         }
-//                                                              
-//         else if(0 == strcmp((char const *)SendBuff,"go_set") && 0==Volume.recv_times)//进入设置模式
-//        {
-//          Volume.recv_times=1;//第一次接收到有效数据
-//          flag.current_state=1;
-//          flag.task_flag=1;
-//          memset(Volume.data,0,600);//进入设置状态时清空数据存储区域
-//          //OSTaskResume(5);//恢复任务B
-//        }
-//        else if(0 == strcmp((char const *)SendBuff,"go_start") && 0==Volume.recv_times)//进入运行模式
-//        {
-//           Volume.recv_times=1;//第一次接收到有效数据
-//           flag.current_state=2;
-//           flag.task_flag=2;
-//          // OSTaskResume(6);//恢复任务C
-//        }
-//        else if(1==flag.current_state &&  0!=Volume.recv_times)
-//        {
-//          Volume.recv_times++;
-//          flag.task_flag=1;
-//         // OSTaskResume(5);//恢复任务B
-//        }
-//        else if(2==flag.current_state &&  0!=Volume.recv_times)
-//        {
-//          Volume.recv_times++;
-//          flag.task_flag=2;
-//         // OSTaskResume(6);//恢复任务C
-//        }else//错误提示
-//        {
-//          strcpy((char *)SendBuff,(const char*)err_display);
-//          Volume.recv_len = strlen((const char *)SendBuff); 
-//          
-//          MYDMA_Enable(DMA2_Stream7,Volume.recv_len); 
-//           while(1)
-//            {
-//                if(DMA_GetFlagStatus(DMA2_Stream7,DMA_FLAG_TCIF7)!=RESET)
-//                { 
-//                  DMA_ClearFlag(DMA2_Stream7,DMA_FLAG_TCIF7);
-//                  break; 
-//                }
-//             }
-//        }
-//        */
-//          
-//
-//           
-//          
-//          }
-//        
-//        delay_ms(20);
-//        //OSTaskSuspend(OS_PRIO_SELF);//挂起自身任务
-//      } 
-//        
-//	
-//}
 
-//LED任务B---设置状态
+
+//设置任务
 void Set_Task(void *pdata)
 {
   u8 message[200];//设置模式下的信息打印
@@ -179,6 +92,7 @@ void Set_Task(void *pdata)
           //数据保存
           memset(Volume.data,0,101);//数据清空
           Data_Save();//数据保存
+          STMFLASH_Write(FLASH_SAVE_ADDR,Volume.data,101);//FLASH写
           
           memset(Rx_Buff,0,650);//清空接收数据缓冲区
         }else
@@ -198,7 +112,7 @@ void Set_Task(void *pdata)
 
  }
 
-//运行状态
+//输出任务
 void Run_Task(void *pdata)
 {
   u8 sd = 0;//当前脉冲段
@@ -236,15 +150,15 @@ void Run_Task(void *pdata)
                     Pluse_Number(sd);
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
-                    simulation.ext_signal=0;
+                    Volume.ext_signal=0;
                     
                     while(flag.send_finish_flag == 0 && flag.current_state==2);//循环等待到一段脉冲发送完成
                     
                    
-                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2]  &  0x0000FFFF)+1));//等待信号
+                    while(Volume.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2]  &  0x0000FFFF)+1));//等待信号
                     
                    // OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
-                    simulation.ext_signal=0;
+                    Volume.ext_signal=0;
                     //OS_EXIT_CRITICAL();  //退出临界区(开中断)
         };break;
         case 4:{
@@ -263,12 +177,12 @@ void Run_Task(void *pdata)
                     Pluse_Number(sd);
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
-                    simulation.ext_signal=0;                   
+                    Volume.ext_signal=0;                   
                     //while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
-                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2] & 0x0000FFFF)+1));//等待信号
+                    while(Volume.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2] & 0x0000FFFF)+1));//等待信号
                     
                    // OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
-                    simulation.ext_signal=0;
+                    Volume.ext_signal=0;
                     TIM_Cmd(Volume.PWM_TIMx, DISABLE);                  
                     TIM_Cmd(Volume.CNT_TIMx, DISABLE);
                     //OS_EXIT_CRITICAL();  //退出临界区(开中断)
@@ -277,15 +191,15 @@ void Run_Task(void *pdata)
                     Pluse_Number(sd);
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[Volume.pulse_offset[sd]],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[Volume.pulse_offset[sd]],Volume.PWM_TIMx);//脉冲输出
-                    simulation.ext_signal=0;                   
+                    Volume.ext_signal=0;                   
                     //while(flag.send_finish_flag == 0);//循环等待到一段脉冲发送完成
-                    while(simulation.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2] & 0x0000FFFF)+1))//等待信号
+                    while(Volume.ext_signal!=((Volume.data[Volume.pulse_offset[sd]+2] & 0x0000FFFF)+1))//等待信号
                     {
                       if(flag.send_finish_flag != 0)
                         break;
                     }                    
                    // OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
-                    simulation.ext_signal=0;
+                    Volume.ext_signal=0;
                     TIM_Cmd(Volume.PWM_TIMx, DISABLE);                  
                     TIM_Cmd(Volume.CNT_TIMx, DISABLE);
                     //OS_EXIT_CRITICAL();  //退出临界区(开中断)
@@ -330,7 +244,13 @@ void DATA_Task(void *pdata)
         switch(flag.current_state)//判断当前状态
         {
         case 0:{//空闲
-          if(0 == strcmp((char const *)Rx_Buff,"go_set"))//进入设置模式
+          if(0 == strcmp((char const *)Rx_Buff,"data"))//查看上次数据
+          {
+             memset(Rx_Buff,0,650);//清空接收数据缓冲区
+             Print_Data();
+          
+          
+          }else if(0 == strcmp((char const *)Rx_Buff,"go_set"))//进入设置模式
           {
             memset(Rx_Buff,0,650);//清空接收数据缓冲区
             
@@ -465,7 +385,7 @@ void EXTI4_IRQHandler(void)
        
         OSIntEnter();
         
-        simulation.ext_signal=1;
+        Volume.ext_signal=1;
 
         EXTI->PR=1<<4;  //清除LINE4上的中断标志位
         OSIntExit();
@@ -477,15 +397,15 @@ void EXTI9_5_IRQHandler(void)
         OSIntEnter(); 
         if(EXTI_GetITStatus(EXTI_Line5) != RESET)
         {
-          simulation.ext_signal=2;   
+          Volume.ext_signal=2;   
           EXTI->PR=1<<5;  //清除LINE上的中断标志位
         }else if(EXTI_GetITStatus(EXTI_Line6) != RESET)
         {
-          simulation.ext_signal=3;   
+          Volume.ext_signal=3;   
           EXTI->PR=1<<6;  //清除LINE上的中断标志位
         }else if(EXTI_GetITStatus(EXTI_Line7) != RESET)
         {
-          simulation.ext_signal=4;   
+          Volume.ext_signal=4;   
           EXTI->PR=1<<7;  //清除LINE上的中断标志位
         }
         

@@ -1,11 +1,34 @@
 #include "sys.h"
-#include "usart.h"	
+#include "usart.h"
+#include "stdio.h"
 ////////////////////////////////////////////////////////////////////////////////// 	 
 //如果使用ucos,则包括下面的头文件即可.
 #if SYSTEM_SUPPORT_OS
 #include "includes.h"					//ucos 使用	  
 #endif
 
+#if 1
+//#pragma import(__use_no_semihosting)             
+               
+struct __FILE 
+{ 
+	int handle; 
+}; 
+
+FILE __stdout;       
+  
+void _sys_exit(int x) 
+{ 
+	x = x; 
+} 
+
+int fputc(int ch, FILE *f)
+{ 	
+	while((USART1->SR&0X40)==0);   
+	USART1->DR = (u8) ch;      
+	return ch;
+}
+#endif
 
 
 #if EN_USART1_RX   //如果使能了接收
