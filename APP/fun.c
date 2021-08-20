@@ -8,42 +8,24 @@ extern u8 Rx_Buff[650];//接收缓冲区
 
 struct V{
   //计量数据
-  u8  interruput_times;//计数器中断次数 
-  TIM_TypeDef * CNT_TIMx;//计数定时器
-  TIM_TypeDef * PWM_TIMx;//PWM定时器
-  u8 ext_signal;//外部信号
+  u16  interruput_times;//计数器中断次数 *
+  u16  pulse_suspend;//,满65535进入中断次数 *
+  
+  
+  TIM_TypeDef * CNT_TIMx;//计数定时器*
+  TIM_TypeDef * PWM_TIMx;//PWM定时器*
+  
   //参数数据
-
-  u16 pulse_remainder;//脉冲余数
-  u8 pulse_offset[20];//每一段的起始位（偏移量）
+  u16 pulse_remainder;//脉冲余数  *
   u32 pulse_num;//总脉冲段数，默认两段脉冲
+
   u32 data[101];//脉冲段数据 
+  u32 send_pulse_num[20];//脉冲段发送的个数
 };
 
 
 extern struct V Volume;
 
-void data_init(void)//数据初始化
-{
-  Volume.pulse_num=2;//两段脉冲
-  Volume.CNT_TIMx=TIM9;
-  Volume.PWM_TIMx=TIM10;//端子定时器指定
-  Volume.pulse_offset[0]=1;
-  Volume.pulse_offset[1]=6;
-  //两段脉冲，Y0输出，速率100和10，个数为1000和100个，等待模式为脉冲发送完成模式和等待时间模式，使用时间寄存器T1，时间为500ms跳转默认下段一
-  Volume.data[0] = 0x00000002;
-  Volume.data[1] = 0x0000000A;
-  Volume.data[2] = 0x00000064;
-  Volume.data[3] = 0x00030001;
-  Volume.data[4] = 0x00000000;
-  Volume.data[5] = 0x00000000;
-  Volume.data[6] = 0x00000002;
-  Volume.data[7] = 0x00000014;
-  Volume.data[8] = 0x00020000;
-  Volume.data[9] = 0x00000BB8;
-  Volume.data[10] = 0x00000001;
-   
-}
 
 u32 My_Atoi(char *source) //字符串转整形,遇到第一个非数字停止
 {
@@ -101,19 +83,7 @@ void Led_Status(u8 state)//LED 状态
           STA_LED2=1;};break;
   }
 }
-/*
-bool Output_Check(u8 *recv_data)//输出端子有效性检测
-{
-  u8 data_len=strlen((char *)recv_data);
-  if(data_len > 2 || data_len ==0)//长度检查
-    return false;
-  
-    if(recv_data[0]!='Y' || (recv_data[1]<'0' || recv_data[1]>'3'))
-      return false;
-    
-  return true;
-}
-*/
+
 bool Number_Sum_Check(u8 *recv_data)//总脉冲段数有效性检测
 {
   u8 *p = recv_data;
@@ -292,10 +262,26 @@ bool Section_Num_Check(u8 *recv_data)//跳转脉冲段序号有效性检测
 }
 
  
-
 void Output_Place(u32 data)//端子指定定时器初始化
 {
 
+          switch(data)//根据端子配置定时器
+          {
+             case 0:{Volume.CNT_TIMx = TIM9;
+                     Volume.PWM_TIMx = TIM10;
+             };break;
+             case 1:{Volume.CNT_TIMx = TIM12;
+                     Volume.PWM_TIMx = TIM13;
+             };break;
+             case 2:{Volume.CNT_TIMx = TIM9;
+                     Volume.PWM_TIMx = TIM11;
+             };break;
+             case 3:{Volume.CNT_TIMx = TIM12;
+                    Volume.PWM_TIMx = TIM14;
+             };break;  
+           }
+  
+  
   switch(data)
   {
     case 0:{//Y0输出
@@ -321,24 +307,13 @@ void Output_Place(u32 data)//端子指定定时器初始化
   
   }
   
-          switch(data)//根据端子配置定时器
-           {
-             case 0:{Volume.CNT_TIMx = TIM9;
-                     Volume.PWM_TIMx = TIM10;
-             };break;
-             case 1:{Volume.CNT_TIMx = TIM12;
-                    Volume.PWM_TIMx = TIM13;
-             };break;
-             case 2:{Volume.CNT_TIMx = TIM9;
-                    Volume.PWM_TIMx = TIM11;
-             };break;
-             case 3:{Volume.CNT_TIMx = TIM12;
-                    Volume.PWM_TIMx = TIM14;
-             };break;  
-           }
-  
+        
   
 }
+
+
+
+
 
 void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,u32 frequency,u32 port)//根据脉冲频率设置寄存器值
 {
@@ -410,7 +385,7 @@ void Print_Mode_Switch(u8 * send_data)//数据打印
          }
 }
 
-bool Data_Head_Check(u8 *p)//数据头
+bool Data_Head_Check(u8 *p)//数据头检测
 {
   //数据头
   if(Rx_Buff[0] == 'H')
@@ -726,65 +701,65 @@ u8 Data_Check(void)//数据帧校验,错误返回错误号，正确返回0
 void Data_Pulse_Save(u8 *p)//脉冲段数据保存
 {
   u8 sd=0;
-  Volume.pulse_offset[sd]=1;
+  //Volume.pulse_offset[sd]=1;
   while(sd < Volume.pulse_num)
   {
-    Volume.data[Volume.pulse_offset[sd]] = My_Atoi((char*)p);//脉冲速率
+    Volume.data[1+sd*5] = My_Atoi((char*)p);//脉冲速率
     p=p+strlen((const char *)p)+1;
-    Volume.data[Volume.pulse_offset[sd]+1] = My_Atoi((char*)p);//脉冲个数
+    Volume.data[1+sd*5+1] = My_Atoi((char*)p);//脉冲个数
     p=p+strlen((const char *)p)+1;
     switch(*p)
     {
         case 'F':{
           p+=2;
-           Volume.data[Volume.pulse_offset[sd]+2] = 1<<16;
-           Volume.data[Volume.pulse_offset[sd]+3] = 0;
-           Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);
+           Volume.data[1+sd*5+2] = 1<<16;
+           Volume.data[1+sd*5+3] = 0;
+           Volume.data[1+sd*5+4] = My_Atoi((char*)p);
         };break;
         case 'T':{
         p+=2;
-           Volume.data[Volume.pulse_offset[sd]+2] = 2<<16;
-           Volume.data[Volume.pulse_offset[sd]+3] = My_Atoi((char*)p);//时间
+           Volume.data[1+sd*5+2] = 2<<16;
+           Volume.data[1+sd*5+3] = My_Atoi((char*)p);//时间
           while(*p)
             p++;
           p++;
-          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);      
+          Volume.data[1+sd*5+4] = My_Atoi((char*)p);      
         };break;
         case 'S':{
         p+=3;
-           Volume.data[Volume.pulse_offset[sd]+2] = (3<<16)+My_Atoi((char*)p);
-           Volume.data[Volume.pulse_offset[sd]+3] = 0;
+           Volume.data[1+sd*5+2] = (3<<16)+My_Atoi((char*)p);
+           Volume.data[1+sd*5+3] = 0;
           while(*p)
             p++;
           p++;
-          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);    
+          Volume.data[1+sd*5+4] = My_Atoi((char*)p);    
         };break;
         case 'A':{
         p+=2;
-           Volume.data[Volume.pulse_offset[sd]+2] = 4<<16;
-           Volume.data[Volume.pulse_offset[sd]+3] = My_Atoi((char*)p);//时间
+           Volume.data[1+sd*5+2] = 4<<16;
+           Volume.data[1+sd*5+3] = My_Atoi((char*)p);//时间
           while(*p)
             p++;
           p++;
-          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);      
+          Volume.data[1+sd*5+4] = My_Atoi((char*)p);      
         };break;
         case 'E':{
         p+=3;
-           Volume.data[Volume.pulse_offset[sd]+2] = (5<<16)+My_Atoi((char*)p);
-           Volume.data[Volume.pulse_offset[sd]+3] = 0;
+           Volume.data[1+sd*5+2] = (5<<16)+My_Atoi((char*)p);
+           Volume.data[1+sd*5+3] = 0;
           while(*p)
             p++;
           p++;
-          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);
+          Volume.data[1+sd*5+4] = My_Atoi((char*)p);
         };break;
         case 'X':{
          p+=3;
-           Volume.data[Volume.pulse_offset[sd]+2] = (6<<16)+My_Atoi((char*)p);
-           Volume.data[Volume.pulse_offset[sd]+3] = 0;
+           Volume.data[1+sd*5+2] = (6<<16)+My_Atoi((char*)p);
+           Volume.data[1+sd*5+3] = 0;
           while(*p)
             p++;
           p++;
-          Volume.data[Volume.pulse_offset[sd]+4] = My_Atoi((char*)p);
+          Volume.data[1+sd*5+4] = My_Atoi((char*)p);
         };break;
     
     }
@@ -794,7 +769,7 @@ void Data_Pulse_Save(u8 *p)//脉冲段数据保存
     {
       p+=2;
       sd++;
-      Volume.pulse_offset[sd]=1+5*sd;
+      
     }else
    sd++;
       
@@ -873,13 +848,13 @@ void Err_Print(u8 err ,u8 *message)//错误打印
 void Pluse_Number(u8 sd)//根据个数设置中断次数
 {
 
-                  if(Volume.data[Volume.pulse_offset[sd]+1] > 65535)//判断脉冲个数
+                  if(Volume.data[1+sd*5+1] > 65535)//判断脉冲个数
                   {
-                    Volume.interruput_times = Volume.data[Volume.pulse_offset[sd]+1] / 65535;
-                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[sd]+1] % 65535;
+                    Volume.interruput_times = Volume.data[1+sd*5+1] / 65535;
+                    Volume.pulse_remainder = Volume.data[1+sd*5+1] % 65535;
                   }else
                   {
-                    Volume.pulse_remainder = Volume.data[Volume.pulse_offset[sd]+1];
+                    Volume.pulse_remainder = Volume.data[1+sd*5+1];
                   }
                                
                   if(Volume.interruput_times > 0)
@@ -893,7 +868,7 @@ void Pluse_Number(u8 sd)//根据个数设置中断次数
 }  
 
 
-void Print_Data(void)
+void Print_Data(void)//掉电保持数据打印
 {
   
   
@@ -970,3 +945,16 @@ void Print_Data(void)
    }
     
 }  
+
+
+void Pulse_Num_Print(u8 sd)//脉冲输出个数打印
+{
+  u8 offset=1;
+  for(;offset<=sd;offset++)
+  {
+    printf("\r\n段号:%d ",offset);
+    printf("发送个数:%d",Volume.send_pulse_num[offset-1]);
+
+  }
+
+}
