@@ -30,8 +30,7 @@ struct F{
   u8  current_state;//0:空闲状态    1：设置脉冲数状态    2：运行状态
   u8  rx_flag; //数据帧接收标志,表示接收到数据
   u8  send_finish_flag;//发送一段脉冲完成标志位*
-  u8  ext_signal;//外部信号*0表示没信号，10、11、12、13表示W0   
-  //u8  signal_mode;//中断信号模式->3、5、6
+  u8  ext_signal;//外部信号*0表示没信号，10、11、12、13表示W0   6
   
 }flag;
 

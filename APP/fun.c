@@ -313,8 +313,6 @@ void Output_Place(u32 data)//端子指定定时器初始化
 
 
 
-
-
 void Frequency_Select(u32 *PWM_CK_CNT,u16 *PWM_PRESCALER,TIM_TypeDef * PWM_TIMx,u32 frequency,u32 port)//根据脉冲频率设置寄存器值
 {
 
@@ -651,9 +649,17 @@ u8 Data_Format_Check(u8 *p)//数据格式判断
   for(;temp<data_len;temp++)//数据分隔符替换为0
   {
     if(*str == '-')
+    {
+       if(*(str+1) == '-')
+        return 7;
+       if(*(str+1) == '\r' || *(str+1) == '\0' || *(str-1) == '\n')
+        return 7;
       *str = 0;
+    }
+      
     str++;
   }
+  
   u8 err=Pulse_Data(p);
   if(err)//脉冲段判断
   {
@@ -680,12 +686,78 @@ if(temp != data)
 }
 
 
-//bool Output_Check(u8 *p)//输出端子检测（不能有相邻的两个相同触发端子）
-//{
-//  u8 sd=0;
-//  while(*p)
-//
-//}
+bool Output_Check(u8 *p)//输出端子检测（不能有相邻的两个相同触发端子）
+{
+  u8 w[4][20];
+  memset(w,0,20);
+  
+  u8 sd = 0;
+  u32 dat=0;
+  while(!(*p==0 && *(p+1)==0))
+  {
+    if(*p=='\r' && *(p+1) == '\n')
+      sd++;
+      
+    if(*p == 'W')//发现触发端子段
+    {
+      if(*(p+1)=='0')
+      {
+        p+=3;
+        dat = My_Atoi((char *)p);
+        if(dat == 0)
+          w[0][sd] = 21;
+        else
+          w[0][sd] = dat;  
+      }else if(*(p+1)=='1')
+      {
+        p+=3;
+        dat = My_Atoi((char *)p);
+        if(dat == 0)
+          w[1][sd] = 21;
+        else
+          w[1][sd] = dat;      
+      }else if(*(p+1)=='2')
+      {
+        p+=3;
+        dat = My_Atoi((char *)p);
+        if(dat == 0)
+          w[2][sd] = 21;
+        else
+          w[2][sd] = dat;      
+      }else if(*(p+1)=='3')
+      {
+        p+=3;
+        dat = My_Atoi((char *)p);
+        if(dat == 0)
+          w[3][sd] = 21;
+        else
+          w[3][sd] = dat;      
+      } 
+    }    
+    p++;
+    
+  }
+  sd = 0;
+  dat=0;
+  for(; dat < 4;dat++)//二维数组遍历
+  {
+    for(;sd < 20;sd++)
+    {
+       if(w[dat][sd]== 21)
+      {
+        if(w[dat][sd+1] !=0)
+          return false;
+      }else if(w[dat][sd]!=0)
+      {
+        if(w[dat][w[dat][sd]] !=0)
+          return false;         
+      }
+    }
+  }
+  
+  
+  return true;
+}
 
 u8 Data_Check(void)//数据帧校验,错误返回错误号，正确返回0
 {
@@ -702,7 +774,8 @@ u8 Data_Check(void)//数据帧校验,错误返回错误号，正确返回0
  if(!Data_Length_Check(p))
  return 9;
  
-
+ if(!Output_Check(p))//输出端子检测
+ return 10;
   return 0;
 }
 
@@ -836,7 +909,7 @@ void Err_Print(u8 err ,u8 *message)//错误打印
                     memset(message,0,200);
                    };break;
            case 7:{ 
-                    strcpy((char *)message,"其他错误错误!");
+                    strcpy((char *)message,"其他错误!");
                     Print_Mode_Switch(message);
                     memset(message,0,200);
                    };break;
@@ -847,6 +920,11 @@ void Err_Print(u8 err ,u8 *message)//错误打印
                    };break;
            case 9:{ 
                     strcpy((char *)message,"数据长度错误!");
+                    Print_Mode_Switch(message);
+                    memset(message,0,200);
+                   };break;
+           case 10:{ 
+                    strcpy((char *)message,"连续两段脉冲触发端子不能相同!");
                     Print_Mode_Switch(message);
                     memset(message,0,200);
                    };break;

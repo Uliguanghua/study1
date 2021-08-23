@@ -62,6 +62,10 @@ void PWM_TIM10_Configuration(void)
   
   TIM_SelectMasterSlaveMode( TIM10, TIM_MasterSlaveMode_Enable);		// 定时器主从模式使能
   TIM_SelectOutputTrigger( TIM10, TIM_TRGOSource_Update);			// 选择触发方式：使用更新事件作为触发输出
+  
+  
+       TIM_OC1PreloadConfig(TIM10,TIM_OCPreload_Enable);                          //使能TIM10在CCR1上的预装载寄存器
+//       TIM_ARRPreloadConfig(TIM10,ENABLE);      
 
   TIM_Cmd(TIM10, DISABLE);
 }
@@ -246,7 +250,7 @@ void CNT_TIM9_Configuration(uint16_t TIM_TS_ITRx)
   /* 时基配置 */
   TIM_TimeBaseStructure.TIM_Prescaler = 0;                           //预分频值
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;        //向上计数
-  TIM_TimeBaseStructure.TIM_Period = 0x14;                         //定时周期
+  TIM_TimeBaseStructure.TIM_Period = 0;                         //定时周期
   TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;            //分频因子
   TIM_TimeBaseInit(TIM9, &TIM_TimeBaseStructure);
   
@@ -290,6 +294,13 @@ void Pulse_Output_Number(u16 NumPulse, TIM_TypeDef * CNT_TIMx)//脉冲个数设置
 {
  TIM_Cmd(CNT_TIMx, DISABLE);
  TIM_SetCounter(CNT_TIMx, 0);
+//if(NumPulse == 1)
+//{
+//  CNT_TIM9_Configuration(TIM_TS_ITR2);
+//
+//}
+////   TIM9->EGR = 1;
+//else
  TIM_SetAutoreload(CNT_TIMx, NumPulse-1);                           //设置中断更新数
  TIM_ClearFlag(CNT_TIMx, TIM_FLAG_Update);
  TIM_Cmd(CNT_TIMx, ENABLE);
