@@ -62,6 +62,7 @@ void My_Itoa (u32 num,char str[])//整型转字符串
 }
 
 
+
 void Led_Status(u8 state)//LED 状态
 {
   switch(state)
@@ -931,19 +932,19 @@ void Err_Print(u8 err ,u8 *message)//错误打印
       }
 }
 
-void Pluse_Number(u8 sd)//根据个数设置中断次数
+void Pluse_Number(u32 num)//根据个数设置中断次数
 {
                   
                   Volume.interruput_times=0;
                   Volume.pulse_remainder =0;
                   
-                  if(Volume.data[1+sd*5+1] > 65535)//判断脉冲个数
+                  if(num > 65535)//判断脉冲个数
                   {
-                    Volume.interruput_times = Volume.data[1+sd*5+1] / 65535;
-                    Volume.pulse_remainder = Volume.data[1+sd*5+1] % 65535;
+                    Volume.interruput_times = num / 65535;
+                    Volume.pulse_remainder = num % 65535;
                   }else
                   {
-                    Volume.pulse_remainder = Volume.data[1+sd*5+1];
+                    Volume.pulse_remainder = num;
                   }
                                
                   if(Volume.interruput_times > 0)

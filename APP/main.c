@@ -108,6 +108,7 @@ void Set_Task(void *pdata)
 void Run_Task(void *pdata)
 {
   u8 sd = 0;//当前脉冲段
+  u8 send_success=0;
  
   OS_CPU_SR cpu_sr=0;
     while(1)
@@ -119,7 +120,7 @@ void Run_Task(void *pdata)
       Tim_Init();
       Output_Place(Volume.data[0]>>16);          //端子指定，定时器选择
       Volume.pulse_num=Volume.data[0]&0x0000FFFF;//总段数
-      memset(Volume.send_pulse_num,0,20);//清空个数存储区
+      memset(Volume.send_pulse_num,0,sizeof(Volume.send_pulse_num));//清空个数存储区
       
       while(sd+1 <= Volume.pulse_num)
       {
@@ -133,29 +134,53 @@ void Run_Task(void *pdata)
         {
           //发送完成模式
         case 1:{
-                    Pluse_Number(sd);
+                    Pluse_Number(Volume.data[1+sd*5+1]);
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[1+sd*5],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[1+sd*5],Volume.PWM_TIMx);//脉冲输出
-                    
-                    while(flag.send_finish_flag == 0 && flag.current_state==2);                                          //循环等待到一段脉冲发送完成
-                   
-                    OS_ENTER_CRITICAL();
-                    Volume.send_pulse_num[sd]=Volume.pulse_suspend*65535+Volume.pulse_remainder;
-                    OS_EXIT_CRITICAL();
+                    while(!send_success)//反馈
+                    {
+                      while(flag.send_finish_flag == 0 && flag.current_state==2);                                          //循环等待到一段脉冲发送完成
+                      
+                      OS_ENTER_CRITICAL();
+                      Volume.send_pulse_num[sd]=Volume.pulse_suspend*65535+Volume.pulse_remainder;
+                      OS_EXIT_CRITICAL();
+                      if(Volume.send_pulse_num[sd] != Volume.data[1+sd*5+1])
+                      {     
+                        Pluse_Number(Volume.data[1+sd*5+1]-Volume.send_pulse_num[sd]);
+                        PWM_Output(Volume.data[1+sd*5],Volume.PWM_TIMx);//脉冲输出
+                        OS_ENTER_CRITICAL();
+                        flag.send_finish_flag=0;
+                        OS_EXIT_CRITICAL(); 
+                      }else
+                        send_success=1;
+                    }
         };break;
         //wait时间模式
         case 2:{
-                    Pluse_Number(sd);
+                    Pluse_Number(Volume.data[1+sd*5+1]);
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[1+sd*5],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[1+sd*5],Volume.PWM_TIMx);//脉冲输出
-                    while(flag.send_finish_flag == 0 && flag.current_state==2);                                        //循环等待到一段脉冲发送完成                                 
-                    Delay_ms(Volume.data[1+sd*5+3]);
-                    Volume.send_pulse_num[sd]=Volume.pulse_suspend*65535+Volume.pulse_remainder;
-                    
+                    while(!send_success)//反馈
+                    {
+                        while(flag.send_finish_flag == 0 && flag.current_state==2);                                        //循环等待到一段脉冲发送完成                                 
+                        Delay_ms(Volume.data[1+sd*5+3]);
+                        OS_ENTER_CRITICAL();
+                        Volume.send_pulse_num[sd]=Volume.pulse_suspend*65535+Volume.pulse_remainder;
+                        OS_EXIT_CRITICAL();
+                      if(Volume.send_pulse_num[sd] != Volume.data[1+sd*5+1])
+                      {     
+                        Pluse_Number(Volume.data[1+sd*5+1]-Volume.send_pulse_num[sd]);
+                        PWM_Output(Volume.data[1+sd*5],Volume.PWM_TIMx);//脉冲输出
+                        OS_ENTER_CRITICAL();
+                        flag.send_finish_flag=0;
+                        OS_EXIT_CRITICAL(); 
+                      }else
+                        send_success=1;
+                    }
         };break;
         //wait信号模式
         case 3:{
-                    Pluse_Number(sd);
+                    Pluse_Number(Volume.data[1+sd*5+1]);
                    
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[1+sd*5],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[1+sd*5],Volume.PWM_TIMx);//脉冲输出
@@ -163,15 +188,24 @@ void Run_Task(void *pdata)
                     OS_ENTER_CRITICAL(); 
                     flag.ext_signal=0;                   
                     OS_EXIT_CRITICAL();
-                    
+                    while(!send_success)//反馈
+                    {
                      while(flag.send_finish_flag == 0 && flag.current_state==2);   //等待输出完成
                      
-                     while((flag.ext_signal!= (Volume.data[1+sd*5+2]  &  0x0000FFFF)+1) && flag.current_state==2);//循环等待到一段脉冲发送完成
+                     
                      Volume.send_pulse_num[sd]=Volume.pulse_suspend*65535+Volume.pulse_remainder;
-                    
-                   
-                    //while((flag.ext_signal!=((Volume.data[1+sd*5+2]  &  0x0000FFFF)+1)) && flag.current_state==2);//等待信号
-                    
+                      
+                     if(Volume.send_pulse_num[sd] != Volume.data[1+sd*5+1])
+                     {     
+                        Pluse_Number(Volume.data[1+sd*5+1]-Volume.send_pulse_num[sd]);
+                        PWM_Output(Volume.data[1+sd*5],Volume.PWM_TIMx);//脉冲输出
+                        OS_ENTER_CRITICAL();
+                        flag.send_finish_flag=0;
+                        OS_EXIT_CRITICAL(); 
+                     }else
+                        send_success=1;          
+                    }
+                     while((flag.ext_signal!= (Volume.data[1+sd*5+2]  &  0x0000FFFF)+1) && flag.current_state==2);//循环等待到一段脉冲发送完成
                     
                     OS_ENTER_CRITICAL();  //进入临界区(关闭中断)
                     flag.ext_signal=0;
@@ -179,7 +213,7 @@ void Run_Task(void *pdata)
         };break;
         //ACT时间模式
         case 4:{
-                    Pluse_Number(sd);
+                     Pluse_Number(Volume.data[1+sd*5+1]);
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[1+sd*5],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[1+sd*5],Volume.PWM_TIMx);                                                   //脉冲输出
                     
@@ -195,7 +229,7 @@ void Run_Task(void *pdata)
         //EXT信号模式
         case 5:{
           
-                    Pluse_Number(sd);
+                    Pluse_Number(Volume.data[1+sd*5+1]);
                   
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[1+sd*5],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[1+sd*5],Volume.PWM_TIMx);                                                    //脉冲输出
@@ -222,7 +256,7 @@ void Run_Task(void *pdata)
           };break;
           //EXT信号/发送完成模式
           case 6:{
-                    Pluse_Number(sd);
+                    Pluse_Number(Volume.data[1+sd*5+1]);
                    
                     Frequency_Select(&PWM_CK_CNT,&PWM_PRESCALER,Volume.PWM_TIMx,Volume.data[1+sd*5],Volume.data[0]>>16);//根据频率设定寄存器值
                     PWM_Output(Volume.data[1+sd*5],Volume.PWM_TIMx);                                                   //脉冲输出
@@ -258,6 +292,7 @@ void Run_Task(void *pdata)
         }
         
         Pulse_Num_Print();//脉冲输出个数打印
+        send_success=0;
         OS_ENTER_CRITICAL();
         flag.send_finish_flag=0;
         OS_EXIT_CRITICAL();
@@ -268,6 +303,7 @@ void Run_Task(void *pdata)
       flag.rx_flag=0;
       flag.current_state=0;
       Led_Status(flag.current_state);
+     
     }
     
     delay_ms(20);
